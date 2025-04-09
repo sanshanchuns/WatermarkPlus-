@@ -12,7 +12,6 @@
 		675BF04C2DA69143009442D4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 675BF04B2DA69143009442D4 /* Assets.xcassets */; };
 		675BF04F2DA69143009442D4 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 675BF04E2DA69143009442D4 /* Preview Assets.xcassets */; };
 		675BF0572DA69172009442D4 /* led-digital-7-1.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 675BF0562DA69172009442D4 /* led-digital-7-1.ttf */; };
-		675BF0592DA6917A009442D4 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 675BF0582DA6917A009442D4 /* Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -133,7 +132,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				675BF0592DA6917A009442D4 /* Info.plist in Resources */,
 				675BF04F2DA69143009442D4 /* Preview Assets.xcassets in Resources */,
 				675BF0572DA69172009442D4 /* led-digital-7-1.ttf in Resources */,
 				675BF04C2DA69143009442D4 /* Assets.xcassets in Resources */,
@@ -287,6 +285,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -314,6 +313,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
