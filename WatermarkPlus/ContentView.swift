@@ -27,8 +27,6 @@ struct ContentView: View {
     @State private var isCustomFont = false
     @State private var unsupportedFormats: [String] = []
     @State private var defaultFontLoaded = false
-    @State private var selectedFontSize: CGFloat = 24
-    @State private var showFontSizePicker = false
     @State private var showDateFormatPicker = false
     @State private var isCustomDateFormat = false
     @FocusState private var focusedField: Field?
@@ -38,9 +36,6 @@ struct ContentView: View {
         case processButton
         case alertButton
     }
-    
-    // 预设字体大小
-    private let presetFontSizes: [CGFloat] = [16, 20, 24, 28, 32]
     
     // 预设日期格式
     private let presetDateFormats: [(name: String, format: String)] = [
@@ -71,9 +66,35 @@ struct ContentView: View {
     
     @State private var dateFormat: String = "yyyy-MM-dd"
     
+    // 添加处理文件夹的函数
+    private func processDirectory(_ url: URL, newSelection: inout [URL]) {
+        guard url.hasDirectoryPath else { return }
+        
+        let fileManager = FileManager.default
+        guard let enumerator = fileManager.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+        
+        for case let fileURL as URL in enumerator {
+            do {
+                let resourceValues = try fileURL.resourceValues(forKeys: [.isDirectoryKey])
+                if resourceValues.isDirectory == false {
+                    let pathExtension = fileURL.pathExtension.lowercased()
+                    if supportedImageExtensions.contains(pathExtension) {
+                        newSelection.append(fileURL)
+                    }
+                }
+            } catch {
+                print("Error reading directory: \(error)")
+            }
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 20) {
-            // 虚线框区域
+            // 修改拖放区域
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
@@ -85,7 +106,7 @@ struct ContentView: View {
                     Image(systemName: "photo.on.rectangle")
                         .font(.system(size: 40))
                         .foregroundColor(.gray)
-                    Text("拖放照片到这里\n或点击选择照片/文件夹")
+                    Text("拖放照片或文件夹到这里\n或点击选择")
                         .multilineTextAlignment(.center)
                         .foregroundColor(.gray)
                 }
@@ -95,18 +116,40 @@ struct ContentView: View {
             .onTapGesture {
                 selectFiles()
             }
-            .onDrop(of: [.image], isTargeted: $isTargeted) { providers in
+            // 修改拖放处理
+            .onDrop(of: [.image, .fileURL], isTargeted: $isTargeted) { providers in
+                // 创建新的选择数组
+                var newSelection: [URL] = []
+                
+                let group = DispatchGroup()
+                
                 for provider in providers {
-                    provider.loadItem(forTypeIdentifier: UTType.image.identifier, options: nil) { (data, error) in
-                        if let url = data as? URL {
+                    group.enter()
+                    provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (urlData, error) in
+                        if let urlData = urlData as? Data,
+                           let url = URL(dataRepresentation: urlData, relativeTo: nil) {
                             DispatchQueue.main.async {
-                                if !selectedImages.contains(url) {
-                                    selectedImages.append(url)
+                                if url.hasDirectoryPath {
+                                    // 处理文件夹
+                                    processDirectory(url, newSelection: &newSelection)
+                                } else {
+                                    // 处理单个文件
+                                    let pathExtension = url.pathExtension.lowercased()
+                                    if supportedImageExtensions.contains(pathExtension) {
+                                        newSelection.append(url)
+                                    }
                                 }
                             }
                         }
+                        group.leave()
                     }
                 }
+                
+                // 当所有文件都处理完后，更新选择
+                group.notify(queue: .main) {
+                    selectedImages = newSelection
+                }
+                
                 return true
             }
             
@@ -173,9 +216,9 @@ struct ContentView: View {
                         // 默认字体按钮
                         Button(action: {
                             if defaultFontLoaded {
-                                selectedFont = NSFont(name: "LED Digital 7", size: selectedFontSize) ?? NSFont.systemFont(ofSize: selectedFontSize)
+                                selectedFont = NSFont(name: "LED Digital 7", size: 24) ?? NSFont.systemFont(ofSize: 24)
                             } else {
-                                selectedFont = NSFont.systemFont(ofSize: selectedFontSize)
+                                selectedFont = NSFont.systemFont(ofSize: 24)
                             }
                             isCustomFont = false
                         }) {
@@ -202,89 +245,6 @@ struct ContentView: View {
                             .cornerRadius(6)
                         }
                         .buttonStyle(.plain)
-                    }
-                    
-                    // 字体大小选择
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("水印大小")
-                            .font(.headline)
-                        
-                        // 预设字体大小按钮
-                        HStack(spacing: 15) {
-                            ForEach(presetFontSizes, id: \.self) { size in
-                                Button(action: {
-                                    selectedFontSize = size
-                                    updateFont()
-                                }) {
-                                    Text("\(Int(size))")
-                                        .frame(width: 40, height: 30)
-                                        .background(selectedFontSize == size ? Color.accentColor : Color.clear)
-                                        .foregroundColor(selectedFontSize == size ? .white : .primary)
-                                        .cornerRadius(6)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            
-                            // 自定义字体大小按钮
-                            Button(action: {
-                                showFontSizePicker = true
-                            }) {
-                                Image(systemName: "textformat.size")
-                                    .frame(width: 30, height: 30)
-                            }
-                            .buttonStyle(.plain)
-                            .help("自定义水印大小")
-                        }
-                    }
-                }
-                
-                // 颜色选择区域
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("水印颜色")
-                        .font(.headline)
-                    
-                    HStack(spacing: 15) {
-                        // 预设颜色按钮
-                        ForEach(presetColors, id: \.name) { preset in
-                            Button(action: {
-                                selectedColor = preset.color
-                                isCustomColor = false
-                            }) {
-                                Circle()
-                                    .fill(Color(nsColor: preset.color))
-                                    .frame(width: 30, height: 30)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.primary, lineWidth: selectedColor == preset.color ? 2 : 0)
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                            .help(preset.name)
-                        }
-                        
-                        // 自定义颜色按钮和预览
-                        HStack(spacing: 8) {
-                            Button(action: {
-                                tempColor = selectedColor
-                                showColorPicker = true
-                            }) {
-                                Image(systemName: "paintpalette")
-                                    .font(.title2)
-                                    .frame(width: 30, height: 30)
-                            }
-                            .buttonStyle(.plain)
-                            .help("自定义颜色")
-                            
-                            if isCustomColor {
-                                Circle()
-                                    .fill(Color(nsColor: selectedColor))
-                                    .frame(width: 30, height: 30)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.primary, lineWidth: 2)
-                                    )
-                            }
-                        }
                     }
                 }
             }
@@ -380,32 +340,6 @@ struct ContentView: View {
                 .padding(.bottom)
             }
         }
-        .sheet(isPresented: $showFontSizePicker) {
-            VStack(spacing: 20) {
-                HStack {
-                    Text("字体大小：")
-                    Slider(value: $selectedFontSize, in: 12...72, step: 1)
-                    Text("\(Int(selectedFontSize))")
-                        .frame(width: 40)
-                }
-                .padding()
-                
-                HStack(spacing: 20) {
-                    Button("取消") {
-                        showFontSizePicker = false
-                    }
-                    .buttonStyle(.bordered)
-                    
-                    Button("确定") {
-                        updateFont()
-                        showFontSizePicker = false
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .padding(.bottom)
-            }
-            .frame(width: 300, height: 150)
-        }
         .sheet(isPresented: $showDateFormatPicker) {
             VStack(spacing: 20) {
                 Text("自定义日期格式")
@@ -460,115 +394,31 @@ struct ContentView: View {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
-        panel.allowedContentTypes = [.image]
-        panel.message = "选择照片或包含照片的文件夹"
-        panel.prompt = "选择"
+        panel.allowedContentTypes = [.image, .folder]
         
-        if panel.runModal() == .OK {
-            // 在主线程中获取 URLs
-            let selectedURLs = panel.urls
-            let fileManager = FileManager.default
-            unsupportedFormats.removeAll()
-            
-            // 打印当前焦点状态
-//            print("选择文件后 - 当前焦点状态：", focusedField as Any)
-//            if let window = NSApp.keyWindow {
-//                print("当前第一响应者：", window.firstResponder as Any)
-//                print("当前焦点视图：", window.firstResponder?.className ?? "nil")
-//
-//                // 打印视图层级
-//                print("视图层级：")
-//                if let contentView = window.contentView {
-//                    printViewHierarchy(contentView, level: 0)
-//                }
-//            }
-            
-            // 在后台线程处理文件选择
-            DispatchQueue.global(qos: .userInitiated).async {
-                let supportedExtensionsSet = Set(supportedImageExtensions)
+        panel.begin { response in
+            if response == .OK {
+                // 创建新的选择数组
+                var newSelection: [URL] = []
                 
-                for url in selectedURLs {
-                    var isDirectory: ObjCBool = false
-                    if fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) {
-                        if isDirectory.boolValue {
-                            // 如果是目录，使用更高效的方式扫描
-                            if let enumerator = fileManager.enumerator(
-                                at: url,
-                                includingPropertiesForKeys: [.isRegularFileKey],
-                                options: [.skipsHiddenFiles],
-                                errorHandler: nil
-                            ) {
-                                // 批量处理文件
-                                var batch: [URL] = []
-                                for case let fileURL as URL in enumerator {
-                                    let pathExtension = fileURL.pathExtension.lowercased()
-                                    if !pathExtension.isEmpty {
-                                        if supportedExtensionsSet.contains(pathExtension) {
-                                            batch.append(fileURL)
-                                        } else if !unsupportedFormats.contains(pathExtension) {
-                                            DispatchQueue.main.async {
-                                                if !unsupportedFormats.contains(pathExtension) {
-                                                    unsupportedFormats.append(pathExtension)
-                                                }
-                                            }
-                                        }
-                                    }
-                                    
-                                    // 每100个文件更新一次UI
-                                    if batch.count >= 100 {
-                                        DispatchQueue.main.async {
-                                            selectedImages.append(contentsOf: batch)
-                                        }
-                                        batch.removeAll()
-                                    }
-                                }
-                                
-                                // 处理剩余的文件
-                                if !batch.isEmpty {
-                                    DispatchQueue.main.async {
-                                        selectedImages.append(contentsOf: batch)
-                                    }
-                                }
-                            }
-                        } else {
-                            // 如果是单个文件，直接检查
-                            let pathExtension = url.pathExtension.lowercased()
-                            if !pathExtension.isEmpty {
-                                if supportedExtensionsSet.contains(pathExtension) {
-                                    DispatchQueue.main.async {
-                                        selectedImages.append(url)
-                                    }
-                                } else if !unsupportedFormats.contains(pathExtension) {
-                                    DispatchQueue.main.async {
-                                        if !unsupportedFormats.contains(pathExtension) {
-                                            unsupportedFormats.append(pathExtension)
-                                        }
-                                    }
-                                }
-                            }
+                for url in panel.urls {
+                    if url.hasDirectoryPath {
+                        // 处理文件夹
+                        processDirectory(url, newSelection: &newSelection)
+                    } else {
+                        // 处理单个文件
+                        let pathExtension = url.pathExtension.lowercased()
+                        if supportedImageExtensions.contains(pathExtension) {
+                            newSelection.append(url)
                         }
                     }
                 }
                 
-                // 所有文件处理完成后，在主线程中更新UI
-                DispatchQueue.main.async {
-                    // 移除自动设置焦点的代码
-                }
+                // 更新选择
+                selectedImages = newSelection
             }
         }
     }
-    
-    // 辅助函数：打印视图层级
-//    private func printViewHierarchy(_ view: NSView, level: Int) {
-//        let indent = String(repeating: "  ", count: level)
-//        print("\(indent)\(view.className)")
-//        if let button = view as? NSButton {
-//            print("\(indent)  - 按钮标题：\(button.title)")
-//        }
-//        for subview in view.subviews {
-//            printViewHierarchy(subview, level: level + 1)
-//        }
-//    }
     
     private func processImages() {
         guard !selectedImages.isEmpty else { return }
@@ -609,6 +459,11 @@ struct ContentView: View {
                     
                     for imageURL in imagesToProcess {
                         if let image = NSImage(contentsOf: imageURL) {
+                            let imageSize = image.size
+                            // 计算适应的字体大小
+                            let adaptiveFontSize = calculateAdaptiveFontSize(for: imageSize)
+                            let fixedFont = NSFontManager.shared.convert(currentFont, toSize: adaptiveFontSize)
+                            
                             // 获取照片的创建时间
                             if let resourceValues = try? imageURL.resourceValues(forKeys: [.creationDateKey]),
                                let creationDate = resourceValues.creationDate {
@@ -626,14 +481,6 @@ struct ContentView: View {
                                 // 绘制水印
                                 let dateString = currentDateFormatter.string(from: creationDate)
                                 
-                                // 根据图片格式调整字体大小
-                                let pathExtension = imageURL.pathExtension.lowercased()
-                                let isHeicFormat = pathExtension == "heic"
-                                
-                                // HEIC 格式使用当前字体大小的 3 倍
-                                let adjustedFontSize = isHeicFormat ? selectedFontSize * 3 : selectedFontSize
-                                let fixedFont = NSFontManager.shared.convert(currentFont, toSize: adjustedFontSize)
-                                
                                 let attributes: [NSAttributedString.Key: Any] = [
                                     .font: fixedFont,
                                     .foregroundColor: currentColor
@@ -642,14 +489,13 @@ struct ContentView: View {
                                 let attributedString = NSAttributedString(string: dateString, attributes: attributes)
                                 let stringSize = attributedString.size()
                                 
-                                // 计算水印位置，考虑字体大小变化
-                                let margin: CGFloat = 20
-                                let scaledMargin = isHeicFormat ? margin * 3 : margin
+                                // 计算自适应边距
+                                let adaptiveMargin = calculateAdaptiveMargin(for: imageSize)
                                 
-                                // 绘制文字，使用固定边距
+                                // 绘制文字，使用等比例边距
                                 attributedString.draw(at: NSPoint(
-                                    x: originalSize.width - stringSize.width - scaledMargin,
-                                    y: scaledMargin
+                                    x: originalSize.width - stringSize.width - adaptiveMargin,
+                                    y: adaptiveMargin
                                 ))
                                 
                                 finalImage.unlockFocus()
@@ -659,7 +505,7 @@ struct ContentView: View {
                                 let savePath = saveURL.appendingPathComponent(fileName)
                                 
                                 // 根据原始图片格式决定保存格式
-                                let imageFormat: NSBitmapImageRep.FileType = pathExtension == "heic" ? .jpeg : .png
+                                let imageFormat: NSBitmapImageRep.FileType = imageURL.pathExtension.lowercased() == "heic" ? .jpeg : .png
                                 
                                 if let tiffData = finalImage.tiffRepresentation,
                                    let bitmapImage = NSBitmapImageRep(data: tiffData) {
@@ -757,14 +603,31 @@ struct ContentView: View {
         }
     }
     
-    private func updateFont() {
-        if isCustomFont {
-            selectedFont = NSFontManager.shared.convert(selectedFont, toSize: selectedFontSize)
-        } else if defaultFontLoaded {
-            selectedFont = NSFont(name: "LED Digital 7", size: selectedFontSize) ?? NSFont.systemFont(ofSize: selectedFontSize)
-        } else {
-            selectedFont = NSFont.systemFont(ofSize: selectedFontSize)
-        }
+    private func calculateAdaptiveFontSize(for imageSize: CGSize) -> CGFloat {
+        // 使用图片对角线长度作为参考
+        let diagonalLength = sqrt(pow(imageSize.width, 2) + pow(imageSize.height, 2))
+        // 字体大小设置为对角线长度的 2%
+        let adaptiveFontSize = diagonalLength * 0.02
+        
+        // 设置最小和最大字体大小限制
+        let minFontSize: CGFloat = 16
+        let maxFontSize: CGFloat = 200
+        
+        return min(max(adaptiveFontSize, minFontSize), maxFontSize)
+    }
+    
+    // 添加计算边距的函数
+    private func calculateAdaptiveMargin(for imageSize: CGSize) -> CGFloat {
+        // 使用图片较短边的长度作为参考
+        let shortestSide = min(imageSize.width, imageSize.height)
+        // 边距设置为较短边的 3%
+        let adaptiveMargin = shortestSide * 0.03
+        
+        // 设置最小和最大边距限制
+        let minMargin: CGFloat = 20
+        let maxMargin: CGFloat = 100
+        
+        return min(max(adaptiveMargin, minMargin), maxMargin)
     }
 }
 
