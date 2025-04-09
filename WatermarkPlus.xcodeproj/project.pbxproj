@@ -11,6 +11,8 @@
 		675BF04A2DA69141009442D4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 675BF0492DA69141009442D4 /* ContentView.swift */; };
 		675BF04C2DA69143009442D4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 675BF04B2DA69143009442D4 /* Assets.xcassets */; };
 		675BF04F2DA69143009442D4 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 675BF04E2DA69143009442D4 /* Preview Assets.xcassets */; };
+		675BF0572DA69172009442D4 /* led-digital-7-1.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 675BF0562DA69172009442D4 /* led-digital-7-1.ttf */; };
+		675BF0592DA6917A009442D4 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 675BF0582DA6917A009442D4 /* Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -20,6 +22,8 @@
 		675BF04B2DA69143009442D4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		675BF04E2DA69143009442D4 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		675BF0502DA69143009442D4 /* WatermarkPlus.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WatermarkPlus.entitlements; sourceTree = "<group>"; };
+		675BF0562DA69172009442D4 /* led-digital-7-1.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "led-digital-7-1.ttf"; sourceTree = "<group>"; };
+		675BF0582DA6917A009442D4 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,6 +59,8 @@
 				675BF0472DA69141009442D4 /* WatermarkPlusApp.swift */,
 				675BF0492DA69141009442D4 /* ContentView.swift */,
 				675BF04B2DA69143009442D4 /* Assets.xcassets */,
+				675BF0562DA69172009442D4 /* led-digital-7-1.ttf */,
+				675BF0582DA6917A009442D4 /* Info.plist */,
 				675BF0502DA69143009442D4 /* WatermarkPlus.entitlements */,
 				675BF04D2DA69143009442D4 /* Preview Content */,
 			);
@@ -127,7 +133,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				675BF0592DA6917A009442D4 /* Info.plist in Resources */,
 				675BF04F2DA69143009442D4 /* Preview Assets.xcassets in Resources */,
+				675BF0572DA69172009442D4 /* led-digital-7-1.ttf in Resources */,
 				675BF04C2DA69143009442D4 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
