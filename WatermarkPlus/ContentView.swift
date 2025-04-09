@@ -11,6 +11,24 @@ import UniformTypeIdentifiers
 import AppKit
 import CoreText
 
+// 添加字体管理器委托类
+class FontManagerDelegate: NSObject {
+    static let shared = FontManagerDelegate()
+    var onFontSelected: ((NSFont) -> Void)?
+    
+    private override init() {
+        super.init()
+        NSFontManager.shared.target = self
+        NSFontManager.shared.action = #selector(changeFont(_:))
+    }
+    
+    @objc func changeFont(_ sender: Any?) {
+        guard let fontManager = sender as? NSFontManager,
+              let font = fontManager.selectedFont else { return }
+        onFontSelected?(font)
+    }
+}
+
 struct ContentView: View {
     @State private var selectedImages: [URL] = []
     @State private var processedCount = 0
@@ -37,6 +55,8 @@ struct ContentView: View {
     @State private var watermarkLayer: NSImage?
     @State private var isLoadingImage: Bool = false
     @State private var isRefreshingWatermark: Bool = false
+    @State private var showFontPanel: Bool = false
+    @State private var ledFont: NSFont = NSFont.systemFont(ofSize: 24)
     
     // 定义可聚焦的字段枚举
     enum Field {
@@ -73,6 +93,11 @@ struct ContentView: View {
     
     @State private var dateFormat: String = "yyyy-MM-dd"
     
+    // 使用计算属性返回默认字体
+    private var defaultFont: NSFont {
+        return ledFont
+    }
+    
     // 添加处理文件夹的函数
     private func processDirectory(_ url: URL, newSelection: inout [URL]) {
         guard url.hasDirectoryPath else { return }
@@ -102,29 +127,29 @@ struct ContentView: View {
     var body: some View {
         HSplitView {
             // 左侧设置面板
-        VStack(spacing: 20) {
+            VStack(spacing: 20) {
                 // 修改拖放区域
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
-                    .frame(height: 200)
-                    .foregroundColor(.gray)
-                    .contentShape(Rectangle())
-                
-                VStack {
-                    Image(systemName: "photo.on.rectangle")
-                        .font(.system(size: 40))
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
+                        .frame(height: 200)
                         .foregroundColor(.gray)
-                        Text("拖放照片或文件夹到这里\n或点击选择")
-                        .multilineTextAlignment(.center)
-                        .foregroundColor(.gray)
+                        .contentShape(Rectangle())
+                    
+                    VStack {
+                        Image(systemName: "photo.on.rectangle")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray)
+                            Text("拖放照片或文件夹到这里\n或点击选择")
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.gray)
+                    }
                 }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.top, 20)
-            .onTapGesture {
-                selectFiles()
-            }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 20)
+                .onTapGesture {
+                    selectFiles()
+                }
                 // 修改拖放处理
                 .onDrop(of: [.image, .fileURL], isTargeted: $isTargeted) { providers in
                     // 创建新的选择数组
@@ -132,12 +157,12 @@ struct ContentView: View {
                     
                     let group = DispatchGroup()
                     
-                for provider in providers {
+                    for provider in providers {
                         group.enter()
                         provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (urlData, error) in
                             if let urlData = urlData as? Data,
                                let url = URL(dataRepresentation: urlData, relativeTo: nil) {
-                            DispatchQueue.main.async {
+                                DispatchQueue.main.async {
                                     if url.hasDirectoryPath {
                                         // 处理文件夹
                                         processDirectory(url, newSelection: &newSelection)
@@ -159,32 +184,32 @@ struct ContentView: View {
                         selectedImages = newSelection
                     }
                     
-                return true
-            }
-            
-            // 状态信息区域
-            VStack(spacing: 5) {
-                if !selectedImages.isEmpty {
-                    Text("已选择 \(selectedImages.count) 张照片")
-                        .font(.headline)
-                } else {
-                    Text("")
-                        .font(.headline)
-                        .frame(height: 20)
+                    return true
                 }
                 
-                if isProcessing {
-                    ProgressView("正在处理...", value: Double(processedCount), total: Double(selectedImages.count))
-                        .progressViewStyle(.linear)
-                } else {
-                    ProgressView("", value: 0, total: 1)
-                        .progressViewStyle(.linear)
-                        .opacity(0)
-                        .frame(height: 20)
+                // 状态信息区域
+                VStack(spacing: 5) {
+                    if !selectedImages.isEmpty {
+                        Text("已选择 \(selectedImages.count) 张照片")
+                            .font(.headline)
+                    } else {
+                        Text("")
+                            .font(.headline)
+                            .frame(height: 20)
+                    }
+                    
+                    if isProcessing {
+                        ProgressView("正在处理...", value: Double(processedCount), total: Double(selectedImages.count))
+                            .progressViewStyle(.linear)
+                    } else {
+                        ProgressView("", value: 0, total: 1)
+                            .progressViewStyle(.linear)
+                            .opacity(0)
+                            .frame(height: 20)
+                    }
                 }
-            }
-            .frame(height: 60)
-            
+                .frame(height: 60)
+                
                 // 水印设置区域
                 VStack(alignment: .leading, spacing: 15) {
                     // 日期格式选择
@@ -192,74 +217,44 @@ struct ContentView: View {
                         Text("日期格式")
                             .font(.headline)
                         HStack {
-                        ForEach(presetDateFormats, id: \.name) { preset in
-                            Button(action: {
-                                dateFormat = preset.format
-                                    generatePreview()
-                            }) {
-                                Text(preset.name)
-                                    .frame(width: 60, height: 30)
-                                    .background(dateFormat == preset.format ? Color.accentColor : Color.clear)
-                                    .foregroundColor(dateFormat == preset.format ? .white : .primary)
-                                    .cornerRadius(6)
+                            ForEach(presetDateFormats, id: \.name) { preset in
+                                Button(action: {
+                                    dateFormat = preset.format
+                                    updateWatermarkLayer()
+                                }) {
+                                    Text(preset.name)
+                                        .frame(width: 60, height: 30)
+                                        .background(dateFormat == preset.format ? Color.accentColor : Color.clear)
+                                        .foregroundColor(dateFormat == preset.format ? .white : .primary)
+                                        .cornerRadius(6)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
-                    }
-                }
-                
-                    // 字体选择
-                    VStack(alignment: .leading) {
-                    Text("水印字体")
-                        .font(.headline)
-                        HStack {
-                        Button(action: {
-                                selectedFont = NSFont(name: "LED Digital 7", size: 24) ?? NSFont.systemFont(ofSize: 24)
-                                generatePreview()
-                        }) {
-                            Text("LED Digital")
-                                .frame(width: 120, height: 30)
-                                .background(!isCustomFont ? Color.accentColor : Color.clear)
-                                .foregroundColor(!isCustomFont ? .white : .primary)
-                                .cornerRadius(6)
-                        }
-                        .buttonStyle(.plain)
-                        
-                        Button(action: {
-                            showFontPicker = true
-                        }) {
-                                Text(isCustomFont ? selectedFont.displayName ?? "自定义字体" : "选择字体")
-                            .frame(width: 120, height: 30)
-                            .background(isCustomFont ? Color.accentColor : Color.clear)
-                            .foregroundColor(isCustomFont ? .white : .primary)
-                            .cornerRadius(6)
-                        }
-                        .buttonStyle(.plain)
-                    }
                     }
                     
                     // 颜色选择
                     VStack(alignment: .leading) {
-                    Text("水印颜色")
-                        .font(.headline)
+                        Text("水印颜色")
+                            .font(.headline)
                         HStack {
-                        ForEach(presetColors, id: \.name) { preset in
-                            Button(action: {
-                                selectedColor = preset.color
-                                isCustomColor = false
+                            ForEach(presetColors, id: \.name) { preset in
+                                Button(action: {
+                                    selectedColor = preset.color
+                                    isCustomColor = false
                                     updateWatermarkLayer()
-                            }) {
-                                Circle()
-                                    .fill(Color(nsColor: preset.color))
-                                    .frame(width: 30, height: 30)
-                                    .overlay(
-                                        Circle()
+                                }) {
+                                    Circle()
+                                        .fill(Color(nsColor: preset.color))
+                                        .frame(width: 30, height: 30)
+                                        .overlay(
+                                            Circle()
                                                 .stroke(selectedColor == preset.color ? Color.accentColor : Color.clear, lineWidth: 2)
-                                    )
+                                        )
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
-                        }
-                        
+                            
                             Button(action: {
                                 showColorPicker = true
                             }) {
@@ -294,6 +289,8 @@ struct ContentView: View {
                 .padding()
                 .background(Color(.textBackgroundColor))
                 .cornerRadius(12)
+                
+                Spacer()
             }
             .frame(minWidth: 300, maxWidth: 400)
             .padding()
@@ -335,27 +332,29 @@ struct ContentView: View {
                     if selectedImages.count > 1 {
                         HStack {
                             Button(action: {
-                                selectedPreviewIndex = max(0, selectedPreviewIndex - 1)
-                                generatePreview()
+                                if !isLoadingImage {
+                                    selectedPreviewIndex = max(0, selectedPreviewIndex - 1)
+                                }
                             }) {
                                 Image(systemName: "chevron.left")
                             }
-                            .disabled(selectedPreviewIndex == 0 || isGeneratingPreview)
+                            .disabled(selectedPreviewIndex == 0 || isLoadingImage)
                             
                             Text("\(selectedPreviewIndex + 1) / \(selectedImages.count)")
                             
                             Button(action: {
-                                selectedPreviewIndex = min(selectedImages.count - 1, selectedPreviewIndex + 1)
-                                generatePreview()
+                                if !isLoadingImage {
+                                    selectedPreviewIndex = min(selectedImages.count - 1, selectedPreviewIndex + 1)
+                                }
                             }) {
                                 Image(systemName: "chevron.right")
                             }
-                            .disabled(selectedPreviewIndex == selectedImages.count - 1 || isGeneratingPreview)
+                            .disabled(selectedPreviewIndex == selectedImages.count - 1 || isLoadingImage)
                         }
                         .padding()
                     }
                 } else {
-                    Text("预览水印效果")
+                    Text("请选择图片以预览水印效果")
                         .foregroundColor(.secondary)
                 }
             }
@@ -369,16 +368,8 @@ struct ContentView: View {
         .onChange(of: selectedColor) { _ in
             updateWatermarkLayer()
         }
-        .onChange(of: selectedFont) { _ in
-            updateWatermarkLayer()
-        }
         .onChange(of: dateFormat) { _ in
             updateWatermarkLayer()
-        }
-        .sheet(isPresented: $showFontPicker) {
-            FontPickerView(selectedFont: $selectedFont, isCustomFont: $isCustomFont) {
-                generatePreview()
-            }
         }
         .sheet(isPresented: $showColorPicker) {
             ColorPickerView(selectedColor: $selectedColor, isCustomColor: $isCustomColor) {
@@ -386,8 +377,11 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            // 注册自定义字体
-            loadDefaultFont()
+            loadLEDFont()
+        }
+        .onDisappear {
+            // 关闭字体面板
+            NSFontPanel.shared.orderOut(nil)
         }
         .alert("处理完成", isPresented: $showAlert) {
             Button("确定", role: .cancel) { }
@@ -433,14 +427,18 @@ struct ContentView: View {
             }
             .frame(width: 300, height: 200)
         }
+        // 监听预览索引变化
+        .onChange(of: selectedPreviewIndex) { _ in
+            loadOriginalImage()
+        }
     }
     
-    private func loadDefaultFont() {
+    private func loadLEDFont() {
         if let fontURL = Bundle.main.url(forResource: "led-digital-7-1", withExtension: "ttf") {
             var error: Unmanaged<CFError>?
             if CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, &error) {
                 defaultFontLoaded = true
-                selectedFont = NSFont(name: "LED Digital 7", size: 24) ?? NSFont.systemFont(ofSize: 24)
+                ledFont = NSFont(name: "LED Digital 7", size: 24) ?? NSFont.systemFont(ofSize: 24)
             } else {
                 print("字体加载失败: \(error.debugDescription)")
                 defaultFontLoaded = false
@@ -482,6 +480,126 @@ struct ContentView: View {
         }
     }
     
+    // 在后台线程加载和转换图片
+    private func loadImageInBackground(_ url: URL) async -> NSImage? {
+        return await Task.detached(priority: .userInitiated) { () -> NSImage? in
+            // 对于 HEIC 格式，使用 CGImageSource 处理
+            guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+            guard let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else { return nil }
+            
+            // 创建 NSImage
+            let size = NSSize(
+                width: cgImage.width,
+                height: cgImage.height
+            )
+            
+            let nsImage = NSImage(size: size)
+            nsImage.lockFocus()
+            
+            let context = NSGraphicsContext.current?.cgContext
+            // 直接绘制，不需要翻转坐标系
+            context?.draw(cgImage, in: CGRect(origin: .zero, size: size))
+            
+            nsImage.unlockFocus()
+            return nsImage
+        }.value
+    }
+    
+    // 加载原始图片
+    private func loadOriginalImage() {
+        guard !selectedImages.isEmpty else {
+            originalPreviewImage = nil
+            watermarkLayer = nil
+            return
+        }
+        
+        isLoadingImage = true
+        
+        Task {
+            let imageURL = selectedImages[selectedPreviewIndex]
+            
+            // 在后台线程加载和处理图片
+            if let image = await loadImageInBackground(imageURL) {
+                await MainActor.run {
+                    originalPreviewImage = image
+                    isLoadingImage = false
+                    updateWatermarkLayer()
+                }
+            }
+        }
+    }
+    
+    // 更新水印层
+    private func updateWatermarkLayer() {
+        guard let originalImage = originalPreviewImage else { return }
+        
+        isRefreshingWatermark = true
+        let imageSize = originalImage.size
+        
+        Task {
+            // 在后台线程准备水印数据
+            let watermarkData = await Task.detached(priority: .userInitiated) { () -> Data? in
+                // 创建位图表示
+                let bitmapRep = NSBitmapImageRep(
+                    bitmapDataPlanes: nil,
+                    pixelsWide: Int(imageSize.width),
+                    pixelsHigh: Int(imageSize.height),
+                    bitsPerSample: 8,
+                    samplesPerPixel: 4,
+                    hasAlpha: true,
+                    isPlanar: false,
+                    colorSpaceName: .deviceRGB,
+                    bytesPerRow: 0,
+                    bitsPerPixel: 0
+                )
+                
+                // 准备绘制属性
+                let dateString = dateFormatter.string(from: Date())
+                let adaptiveFontSize = calculateAdaptiveFontSize(for: imageSize)
+                let adaptiveMargin = calculateAdaptiveMargin(for: imageSize)
+                
+                // 在主线程执行绘制操作
+                await MainActor.run {
+                    NSGraphicsContext.saveGraphicsState()
+                    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmapRep!)
+                    
+                    // 确保背景透明
+                    NSColor.clear.set()
+                    NSRect(origin: .zero, size: imageSize).fill()
+                    
+                    // 设置字体和颜色
+                    let fixedFont = NSFontManager.shared.convert(defaultFont, toSize: adaptiveFontSize)
+                    let attributes: [NSAttributedString.Key: Any] = [
+                        .font: fixedFont,
+                        .foregroundColor: selectedColor
+                    ]
+                    
+                    // 创建并绘制文字
+                    let attributedString = NSAttributedString(string: dateString, attributes: attributes)
+                    let stringSize = attributedString.size()
+                    
+                    attributedString.draw(at: NSPoint(
+                        x: imageSize.width - stringSize.width - adaptiveMargin,
+                        y: adaptiveMargin
+                    ))
+                    
+                    NSGraphicsContext.restoreGraphicsState()
+                }
+                
+                // 在后台线程处理图片数据
+                return bitmapRep?.representation(using: .png, properties: [:])
+            }.value
+            
+            // 在主线程更新UI
+            await MainActor.run {
+                if let watermarkData = watermarkData {
+                    watermarkLayer = NSImage(data: watermarkData)
+                }
+                isRefreshingWatermark = false
+            }
+        }
+    }
+    
     private func processImages() {
         guard !selectedImages.isEmpty else { return }
         
@@ -515,7 +633,7 @@ struct ContentView: View {
                     var failedCount = 0
                     
                     // 创建处理图片用的属性副本
-                    let currentFont = selectedFont
+                    let currentFont = defaultFont
                     let currentColor = selectedColor
                     let currentDateFormatter = dateFormatter
                     
@@ -726,7 +844,7 @@ struct ContentView: View {
                         let adaptiveMargin = calculateAdaptiveMargin(for: imageSize)
                         
                         // 设置字体和颜色
-                        let fixedFont = NSFontManager.shared.convert(selectedFont, toSize: adaptiveFontSize)
+                        let fixedFont = NSFontManager.shared.convert(defaultFont, toSize: adaptiveFontSize)
                         let attributes: [NSAttributedString.Key: Any] = [
                             .font: fixedFont,
                             .foregroundColor: selectedColor
@@ -752,88 +870,6 @@ struct ContentView: View {
             await MainActor.run {
                 previewImage = preview
                 isGeneratingPreview = false
-            }
-        }
-    }
-    
-    // 加载原始图片
-    private func loadOriginalImage() {
-        guard !selectedImages.isEmpty else {
-            originalPreviewImage = nil
-            watermarkLayer = nil
-            return
-        }
-        
-        isLoadingImage = true
-        
-        Task {
-            let imageURL = selectedImages[selectedPreviewIndex]
-            
-            // 在后台线程加载图片
-            let image = await Task.detached(priority: .userInitiated) { () -> NSImage? in
-                return NSImage(contentsOf: imageURL)
-            }.value
-            
-            // 在主线程更新 UI
-            await MainActor.run {
-                originalPreviewImage = image
-                isLoadingImage = false
-                // 加载完原始图片后，生成水印层
-                updateWatermarkLayer()
-            }
-        }
-    }
-    
-    // 更新水印层
-    private func updateWatermarkLayer() {
-        guard let originalImage = originalPreviewImage else { return }
-        
-        isRefreshingWatermark = true
-        
-        Task {
-            // 在后台线程生成水印层
-            let newWatermarkLayer = await Task.detached(priority: .userInitiated) { () -> NSImage? in
-                let imageSize = originalImage.size
-                
-                // 创建透明的水印层
-                let layer = NSImage(size: imageSize)
-                layer.lockFocus()
-                
-                // 确保背景透明
-                NSColor.clear.set()
-                NSRect(origin: .zero, size: imageSize).fill()
-                
-                // 获取日期字符串
-                let dateString = dateFormatter.string(from: Date())
-                
-                // 计算自适应大小
-                let adaptiveFontSize = calculateAdaptiveFontSize(for: imageSize)
-                let adaptiveMargin = calculateAdaptiveMargin(for: imageSize)
-                
-                // 设置字体和颜色
-                let fixedFont = NSFontManager.shared.convert(selectedFont, toSize: adaptiveFontSize)
-                let attributes: [NSAttributedString.Key: Any] = [
-                    .font: fixedFont,
-                    .foregroundColor: selectedColor
-                ]
-                
-                // 创建并绘制文字
-                let attributedString = NSAttributedString(string: dateString, attributes: attributes)
-                let stringSize = attributedString.size()
-                
-                attributedString.draw(at: NSPoint(
-                    x: imageSize.width - stringSize.width - adaptiveMargin,
-                    y: adaptiveMargin
-                ))
-                
-                layer.unlockFocus()
-                return layer
-            }.value
-            
-            // 在主线程更新水印层
-            await MainActor.run {
-                watermarkLayer = newWatermarkLayer
-                isRefreshingWatermark = false
             }
         }
     }
