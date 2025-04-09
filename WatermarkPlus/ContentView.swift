@@ -247,7 +247,7 @@ struct ContentView: View {
                             Button(action: {
                                 selectedColor = preset.color
                                 isCustomColor = false
-                                    generatePreview()
+                                    updateWatermarkLayer()
                             }) {
                                 Circle()
                                     .fill(Color(nsColor: preset.color))
@@ -269,6 +269,27 @@ struct ContentView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                    
+                    Divider()
+                        .padding(.vertical, 10)
+                    
+                    // 处理按钮
+                    Button(action: {
+                        processImages()
+                    }) {
+                        HStack {
+                            if isProcessing {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .padding(.trailing, 5)
+                            }
+                            Text(isProcessing ? "处理中..." : "开始处理")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 36)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(selectedImages.isEmpty || isProcessing)
                 }
                 .padding()
                 .background(Color(.textBackgroundColor))
@@ -279,7 +300,7 @@ struct ContentView: View {
             
             // 右侧预览区域
             VStack {
-            if !selectedImages.isEmpty {
+                if !selectedImages.isEmpty {
                     ZStack {
                         // 原始图片层
                         if let originalImage = originalPreviewImage {
@@ -334,7 +355,7 @@ struct ContentView: View {
                         .padding()
                     }
                 } else {
-                    Text("请选择图片以预览水印效果")
+                    Text("预览水印效果")
                         .foregroundColor(.secondary)
                 }
             }
@@ -446,9 +467,9 @@ struct ContentView: View {
                     if url.hasDirectoryPath {
                         // 处理文件夹
                         processDirectory(url, newSelection: &newSelection)
-                        } else {
+                    } else {
                         // 处理单个文件
-                            let pathExtension = url.pathExtension.lowercased()
+                        let pathExtension = url.pathExtension.lowercased()
                         if supportedImageExtensions.contains(pathExtension) {
                             newSelection.append(url)
                         }
@@ -634,8 +655,6 @@ struct ContentView: View {
                         isProcessing = false
                         selectedImages.removeAll()
                         processedCount = 0
-                        
-                        // 移除自动设置焦点的代码
                     }
                 }
             }
