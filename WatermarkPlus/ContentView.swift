@@ -151,7 +151,7 @@ struct ContentView: View {
                     selectFiles()
                 }
                 // 修改拖放处理
-                .onDrop(of: [.image, .fileURL], isTargeted: $isTargeted) { providers in
+                .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
                     // 创建新的选择数组
                     var newSelection: [URL] = []
                     
@@ -159,6 +159,7 @@ struct ContentView: View {
                     
                     for provider in providers {
                         group.enter()
+                        
                         provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (urlData, error) in
                             if let urlData = urlData as? Data,
                                let url = URL(dataRepresentation: urlData, relativeTo: nil) {
@@ -181,7 +182,9 @@ struct ContentView: View {
                     
                     // 当所有文件都处理完后，更新选择
                     group.notify(queue: .main) {
-                        selectedImages = newSelection
+                        if !newSelection.isEmpty {
+                            selectedImages = newSelection
+                        }
                     }
                     
                     return true
