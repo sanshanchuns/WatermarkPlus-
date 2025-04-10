@@ -58,6 +58,24 @@ struct ContentView: View {
     @State private var showFontPanel: Bool = false
     @State private var ledFont: NSFont = NSFont.systemFont(ofSize: 24)
     
+    // 添加字体大小枚举
+    enum FontSize: String, CaseIterable {
+        case small = "小"
+        case medium = "中"
+        case large = "大"
+        
+        var scaleFactor: Double {
+            switch self {
+                case .small: return 0.02
+                case .medium: return 0.025
+                case .large: return 0.03
+            }
+        }
+    }
+    
+    // 添加字体大小状态
+    @State private var selectedFontSize: FontSize = .small
+    
     // 定义可聚焦的字段枚举
     enum Field {
         case processButton
@@ -75,10 +93,10 @@ struct ContentView: View {
     // 预设颜色（高饱和度）
     private let presetColors: [(name: String, color: NSColor)] = [
         ("柯达黄", NSColor(red: 1.0, green: 0.85, blue: 0.0, alpha: 1.0)),    // 柯达胶卷经典黄
+        ("橙红", NSColor(red: 1.0, green: 0.2, blue: 0.0, alpha: 1.0)),   // 明亮的黄色
+        ("玫红", NSColor(red: 1.0, green: 0.2, blue: 0.6, alpha: 1.0)),    // 鲜艳的玫红色
         ("天蓝", NSColor(red: 0.2, green: 0.6, blue: 1.0, alpha: 1.0)),   // 纯净的蓝色
-        ("翠绿", NSColor(red: 0.2, green: 0.8, blue: 0.2, alpha: 1.0)),   // 鲜艳的绿色
-        ("明黄", NSColor(red: 1.0, green: 0.9, blue: 0.2, alpha: 1.0)),   // 明亮的黄色
-        ("玫红", NSColor(red: 1.0, green: 0.2, blue: 0.6, alpha: 1.0))    // 鲜艳的玫红色
+        ("翠绿", NSColor(red: 0.2, green: 0.8, blue: 0.2, alpha: 1.0))   // 鲜艳的绿色
     ]
     
     // 支持的图片格式
@@ -127,29 +145,29 @@ struct ContentView: View {
     var body: some View {
         HSplitView {
             // 左侧设置面板
-            VStack(spacing: 20) {
+        VStack(spacing: 20) {
                 // 修改拖放区域
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
-                        .frame(height: 200)
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [5]))
+                    .frame(height: 200)
+                    .foregroundColor(.gray)
+                    .contentShape(Rectangle())
+                
+                VStack {
+                    Image(systemName: "photo.on.rectangle")
+                        .font(.system(size: 40))
                         .foregroundColor(.gray)
-                        .contentShape(Rectangle())
-                    
-                    VStack {
-                        Image(systemName: "photo.on.rectangle")
-                            .font(.system(size: 40))
-                            .foregroundColor(.gray)
                             Text("拖放照片或文件夹到这里\n或点击选择")
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.gray)
-                    }
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.gray)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 20)
-                .onTapGesture {
-                    selectFiles()
-                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 20)
+            .onTapGesture {
+                selectFiles()
+            }
                 // 修改拖放处理
                 .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
                     // 创建新的选择数组
@@ -157,13 +175,13 @@ struct ContentView: View {
                     
                     let group = DispatchGroup()
                     
-                    for provider in providers {
+                for provider in providers {
                         group.enter()
                         
                         provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (urlData, error) in
                             if let urlData = urlData as? Data,
                                let url = URL(dataRepresentation: urlData, relativeTo: nil) {
-                                DispatchQueue.main.async {
+                            DispatchQueue.main.async {
                                     if url.hasDirectoryPath {
                                         // 处理文件夹
                                         processDirectory(url, newSelection: &newSelection)
@@ -187,32 +205,32 @@ struct ContentView: View {
                         }
                     }
                     
-                    return true
+                return true
+            }
+            
+            // 状态信息区域
+            VStack(spacing: 5) {
+                if !selectedImages.isEmpty {
+                    Text("已选择 \(selectedImages.count) 张照片")
+                        .font(.headline)
+                } else {
+                    Text("")
+                        .font(.headline)
+                        .frame(height: 20)
                 }
                 
-                // 状态信息区域
-                VStack(spacing: 5) {
-                    if !selectedImages.isEmpty {
-                        Text("已选择 \(selectedImages.count) 张照片")
-                            .font(.headline)
-                    } else {
-                        Text("")
-                            .font(.headline)
-                            .frame(height: 20)
-                    }
-                    
-                    if isProcessing {
-                        ProgressView("正在处理...", value: Double(processedCount), total: Double(selectedImages.count))
-                            .progressViewStyle(.linear)
-                    } else {
-                        ProgressView("", value: 0, total: 1)
-                            .progressViewStyle(.linear)
-                            .opacity(0)
-                            .frame(height: 20)
-                    }
+                if isProcessing {
+                    ProgressView("正在处理...", value: Double(processedCount), total: Double(selectedImages.count))
+                        .progressViewStyle(.linear)
+                } else {
+                    ProgressView("", value: 0, total: 1)
+                        .progressViewStyle(.linear)
+                        .opacity(0)
+                        .frame(height: 20)
                 }
-                .frame(height: 60)
-                
+            }
+            .frame(height: 60)
+            
                 // 水印设置区域
                 VStack(alignment: .leading, spacing: 15) {
                     // 日期格式选择
@@ -220,15 +238,36 @@ struct ContentView: View {
                         Text("日期格式")
                             .font(.headline)
                         HStack {
-                            ForEach(presetDateFormats, id: \.name) { preset in
+                        ForEach(presetDateFormats, id: \.name) { preset in
+                            Button(action: {
+                                dateFormat = preset.format
+                                    updateWatermarkLayer()
+                            }) {
+                                Text(preset.name)
+                                    .frame(width: 60, height: 30)
+                                    .background(dateFormat == preset.format ? Color.accentColor : Color.clear)
+                                    .foregroundColor(dateFormat == preset.format ? .white : .primary)
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                
+                    // 添加字体大小选择
+                    VStack(alignment: .leading) {
+                        Text("字体大小")
+                        .font(.headline)
+                            HStack {
+                            ForEach(FontSize.allCases, id: \.self) { size in
                                 Button(action: {
-                                    dateFormat = preset.format
+                                    selectedFontSize = size
                                     updateWatermarkLayer()
                                 }) {
-                                    Text(preset.name)
+                                    Text(size.rawValue)
                                         .frame(width: 60, height: 30)
-                                        .background(dateFormat == preset.format ? Color.accentColor : Color.clear)
-                                        .foregroundColor(dateFormat == preset.format ? .white : .primary)
+                                        .background(selectedFontSize == size ? Color.accentColor : Color.clear)
+                                        .foregroundColor(selectedFontSize == size ? .white : .primary)
                                         .cornerRadius(6)
                                 }
                                 .buttonStyle(.plain)
@@ -238,33 +277,52 @@ struct ContentView: View {
                     
                     // 颜色选择
                     VStack(alignment: .leading) {
-                        Text("水印颜色")
-                            .font(.headline)
+                    Text("水印颜色")
+                        .font(.headline)
                         HStack {
-                            ForEach(presetColors, id: \.name) { preset in
-                                Button(action: {
-                                    selectedColor = preset.color
-                                    isCustomColor = false
+                        ForEach(presetColors, id: \.name) { preset in
+                            Button(action: {
+                                selectedColor = preset.color
+                                isCustomColor = false
                                     updateWatermarkLayer()
-                                }) {
+                            }) {
+                                Circle()
+                                    .fill(Color(nsColor: preset.color))
+                                    .frame(width: 30, height: 30)
+                                    .overlay(
+                                        Circle()
+                                                    .stroke(selectedColor == preset.color ? Color.accentColor : Color.clear, lineWidth: 2)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
+                            // 自定义颜色选择区域
+                            ZStack {
+                                // 显示选择的自定义颜色
+                                if isCustomColor {
                                     Circle()
-                                        .fill(Color(nsColor: preset.color))
+                                        .fill(Color(nsColor: selectedColor))
                                         .frame(width: 30, height: 30)
                                         .overlay(
                                             Circle()
-                                                .stroke(selectedColor == preset.color ? Color.accentColor : Color.clear, lineWidth: 2)
+                                                .stroke(Color.accentColor, lineWidth: 2)
                                         )
                                 }
+                                
+                                // 调色板按钮
+                                Button(action: {
+                                    showColorPicker = true
+                                }) {
+                                    Image(systemName: "paintpalette.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(isCustomColor ? .primary : .accentColor)
+                                }
                                 .buttonStyle(.plain)
+                                .offset(y: isCustomColor ? -40 : 0) // 选择自定义颜色后上浮
+                                .animation(.spring(response: 0.3), value: isCustomColor)
                             }
-                            
-                            Button(action: {
-                                showColorPicker = true
-                            }) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 24))
-                            }
-                            .buttonStyle(.plain)
+                            .frame(width: 30, height: isCustomColor ? 70 : 30) // 调整高度以适应上浮的按钮
                         }
                     }
                     
@@ -376,7 +434,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showColorPicker) {
             ColorPickerView(selectedColor: $selectedColor, isCustomColor: $isCustomColor) {
-                generatePreview()
+                updateWatermarkLayer()
             }
         }
         .onAppear {
@@ -784,13 +842,14 @@ struct ContentView: View {
         }
     }
     
+    // 计算自适应字体大小的函数
     private func calculateAdaptiveFontSize(for imageSize: CGSize) -> CGFloat {
         // 使用图片对角线长度作为参考
         let diagonalLength = sqrt(pow(imageSize.width, 2) + pow(imageSize.height, 2))
-        // 字体大小设置为对角线长度的 2%
-        let adaptiveFontSize = diagonalLength * 0.02
+        // 根据选择的大小计算字体大小
+        let adaptiveFontSize = diagonalLength * selectedFontSize.scaleFactor
         
-        // 设置最小和最大字体大小限制
+        // 限制最小和最大字体大小
         let minFontSize: CGFloat = 16
         let maxFontSize: CGFloat = 200
         
@@ -999,6 +1058,7 @@ struct ColorPickerView: View {
             .padding()
         }
         .frame(width: 300)
+        .padding()
     }
 }
 
