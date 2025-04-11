@@ -563,32 +563,7 @@ struct ContentView: View {
         }
     }
     
-    // 在后台线程加载和转换图片
-    private func loadImageInBackground(_ url: URL) async -> NSImage? {
-        return await Task.detached(priority: .userInitiated) { () -> NSImage? in
-            // 对于 HEIC 格式，使用 CGImageSource 处理
-            guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-            guard let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else { return nil }
-            
-            // 创建 NSImage
-            let size = NSSize(
-                width: cgImage.width,
-                height: cgImage.height
-            )
-            
-            let nsImage = NSImage(size: size)
-            nsImage.lockFocus()
-            
-            let context = NSGraphicsContext.current?.cgContext
-            // 直接绘制，不需要翻转坐标系
-            context?.draw(cgImage, in: CGRect(origin: .zero, size: size))
-            
-            nsImage.unlockFocus()
-            return nsImage
-        }.value
-    }
-    
-    // 加载原始图片
+    // 修改预览加载函数
     private func loadOriginalImage() {
         guard !selectedImages.isEmpty else {
             originalPreviewImage = nil
@@ -596,18 +571,52 @@ struct ContentView: View {
             return
         }
         
-        isLoadingImage = true
+        Task { @MainActor in
+            isLoadingImage = true
+        }
         
-        Task {
+        Task.detached(priority: .userInitiated) {
             let imageURL = selectedImages[selectedPreviewIndex]
             
-            // 在后台线程加载和处理图片
-            if let image = await loadImageInBackground(imageURL) {
-                await MainActor.run {
-                    originalPreviewImage = image
-                    isLoadingImage = false
+            // 在后台线程加载 HEIC 图片
+            let image: NSImage?
+            let fileExtension = imageURL.pathExtension.lowercased()
+            
+            if fileExtension == "heic" {
+                // 对 HEIC 格式使用 ImageIO
+                guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
+                      let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil)
+                else {
+                    await MainActor.run {
+                        isLoadingImage = false
+                    }
+                    return
+                }
+                
+                let size = CGSize(
+                    width: cgImage.width,
+                    height: cgImage.height
+                )
+                
+                let nsImage = NSImage(size: size)
+                nsImage.lockFocus()
+                if let context = NSGraphicsContext.current?.cgContext {
+                    context.draw(cgImage, in: CGRect(origin: .zero, size: size))
+                }
+                nsImage.unlockFocus()
+                image = nsImage
+            } else {
+                // 其他格式直接使用 NSImage
+                image = NSImage(contentsOf: imageURL)
+            }
+            
+            // 在主线程更新 UI
+            await MainActor.run {
+                if let loadedImage = image {
+                    originalPreviewImage = loadedImage
                     updateWatermarkLayer()
                 }
+                isLoadingImage = false
             }
         }
     }
@@ -814,12 +823,48 @@ struct ContentView: View {
         let outputDir: URL
     }
     
-    // 处理单张图片
+    // 修改处理图片函数
     private func processImage(_ imageURL: URL, with params: ProcessParams) async throws {
-        guard let image = await loadImageInBackground(imageURL) else { return }
+        let fileExtension = imageURL.pathExtension.lowercased()
+        let image: NSImage
+        
+        if fileExtension == "heic" {
+            // 在后台线程加载 HEIC 图片
+            guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
+                  let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil)
+            else {
+                throw NSError(
+                    domain: "WatermarkPlus",
+                    code: 500,
+                    userInfo: [NSLocalizedDescriptionKey: "无法加载HEIC图片：\(imageURL.lastPathComponent)"]
+                )
+            }
+            
+            let size = CGSize(
+                width: cgImage.width,
+                height: cgImage.height
+            )
+            
+            let nsImage = NSImage(size: size)
+            nsImage.lockFocus()
+            if let context = NSGraphicsContext.current?.cgContext {
+                context.draw(cgImage, in: CGRect(origin: .zero, size: size))
+            }
+            nsImage.unlockFocus()
+            image = nsImage
+        } else {
+            // 其他格式直接使用 NSImage
+            guard let loadedImage = NSImage(contentsOf: imageURL) else {
+                throw NSError(
+                    domain: "WatermarkPlus",
+                    code: 500,
+                    userInfo: [NSLocalizedDescriptionKey: "无法加载图片：\(imageURL.lastPathComponent)"]
+                )
+            }
+            image = loadedImage
+        }
         
         let imageSize = image.size
-        let fileExtension = imageURL.pathExtension.lowercased()
         
         // 创建新图像并添加水印
         let newImage = await Task.detached(priority: .userInitiated) { () -> NSImage? in
@@ -835,108 +880,128 @@ struct ContentView: View {
             
             // 设置字体和颜色
             let fixedFont = NSFontManager.shared.convert(params.font, toSize: adaptiveFontSize)
-                                let attributes: [NSAttributedString.Key: Any] = [
-                                    .font: fixedFont,
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: fixedFont,
                 .foregroundColor: params.color
-                                ]
-                                
+            ]
+            
             // 创建并绘制文字
             let attributedString = NSAttributedString(string: params.dateString, attributes: attributes)
-                                let stringSize = attributedString.size()
-                                
-                                attributedString.draw(at: NSPoint(
+            let stringSize = attributedString.size()
+            
+            attributedString.draw(at: NSPoint(
                 x: imageSize.width - stringSize.width - adaptiveMargin,
                 y: adaptiveMargin
-                                ))
-                                
+            ))
+            
             result.unlockFocus()
             return result
         }.value
-                                
+        
         // 保存图像
         if let newImage = newImage {
             try await Task.detached(priority: .userInitiated) {
-                                let fileName = imageURL.lastPathComponent
+                let fileName = imageURL.lastPathComponent
                 let saveURL = params.outputDir.appendingPathComponent(fileName)
                 
-                // 确保目录存在
-                try FileManager.default.createDirectory(
-                    at: params.outputDir,
-                    withIntermediateDirectories: true,
-                    attributes: nil
-                )
+                if !FileManager.default.fileExists(atPath: params.outputDir.path) {
+                    try FileManager.default.createDirectory(
+                        atPath: params.outputDir.path,
+                        withIntermediateDirectories: true,
+                        attributes: nil
+                    )
+                }
                 
                 if let tiffData = newImage.tiffRepresentation,
-                                   let bitmapImage = NSBitmapImageRep(data: tiffData) {
+                   let bitmapImage = NSBitmapImageRep(data: tiffData) {
                     
-                    switch fileExtension {
-                    case "heic", "HEIC":
-                        // 对于 HEIC 格式，使用 ImageIO 框架处理
+                    switch fileExtension.lowercased() {
+                    case "heic":
+                        // 对于 HEIC 格式，使用 ImageIO 框架并保持原始分辨率
                         if let cgImage = newImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-                            // 确保文件扩展名大小写匹配原文件
-                            let originalExtension = imageURL.pathExtension
-                            let saveURLWithCorrectExtension = params.outputDir.appendingPathComponent(
-                                imageURL.deletingPathExtension().lastPathComponent
-                            ).appendingPathExtension(originalExtension)
-                            
                             guard let destination = CGImageDestinationCreateWithURL(
-                                saveURLWithCorrectExtension as CFURL,
+                                saveURL as CFURL,
                                 UTType.heic.identifier as CFString,
                                 1,
                                 nil
-                            ) else {
-                                print("Failed to create CGImageDestination")
-                                return
-                            }
+                            ) else { return }
                             
-                            // 设置 HEIC 压缩参数
+                            // 获取原始图片的属性
+                            guard let sourceImageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
+                                  let properties = CGImageSourceCopyPropertiesAtIndex(sourceImageSource, 0, nil) as? [CFString: Any]
+                            else { return }
+                            
+                            // 获取原始 HEIC 图片的具体尺寸
+                            let originalWidth = properties[kCGImagePropertyPixelWidth] as? Int ?? cgImage.width
+                            let originalHeight = properties[kCGImagePropertyPixelHeight] as? Int ?? cgImage.height
+                            
+                            // 设置输出选项
                             let options: [CFString: Any] = [
                                 kCGImageDestinationLossyCompressionQuality: 0.85,
-                                kCGImageDestinationOptimizeColorForSharing: true,
-                                kCGImageDestinationImageMaxPixelSize: max(imageSize.width, imageSize.height)
+                                kCGImagePropertyOrientation: properties[kCGImagePropertyOrientation] ?? 1,
+                                
+                                // 强制使用原始尺寸
+                                kCGImageDestinationImageMaxPixelSize: max(originalWidth, originalHeight),
+                                kCGImagePropertyPixelWidth: originalWidth,
+                                kCGImagePropertyPixelHeight: originalHeight,
+                                
+                                // 保持原始 DPI
+                                kCGImagePropertyDPIWidth: properties[kCGImagePropertyDPIWidth] ?? 72,
+                                kCGImagePropertyDPIHeight: properties[kCGImagePropertyDPIHeight] ?? 72,
+                                
+                                // 禁用任何自动缩放
+                                kCGImageDestinationOptimizeColorForSharing: false,
+                                
+                                // 使用原始色彩空间
+                                kCGImagePropertyColorModel: properties[kCGImagePropertyColorModel] ?? kCGImagePropertyColorModelRGB
                             ]
                             
-                            CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
-                            if !CGImageDestinationFinalize(destination) {
-                                print("Failed to finalize image destination")
+                            // 创建一个与原始尺寸相同的图像上下文
+                            let context = CGContext(
+                                data: nil,
+                                width: originalWidth,
+                                height: originalHeight,
+                                bitsPerComponent: 8,
+                                bytesPerRow: 0,
+                                space: cgImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!,
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                            )
+                            
+                            if let context = context {
+                                // 在正确的尺寸上绘制图像
+                                context.draw(cgImage, in: CGRect(x: 0, y: 0, width: originalWidth, height: originalHeight))
+                                
+                                if let finalImage = context.makeImage() {
+                                    CGImageDestinationAddImage(destination, finalImage, options as CFDictionary)
+                                    
+                                    if !CGImageDestinationFinalize(destination) {
+                                        print("Failed to finalize HEIC image")
+                                    }
+                                }
                             }
                         }
                         
                     case "png":
-                        // PNG 使用无损压缩
-                        let properties: [NSBitmapImageRep.PropertyKey: Any] = [:]
-                        if let data = bitmapImage.representation(using: .png, properties: properties) {
-                            try data.write(to: saveURL)
-                        }
+                        try bitmapImage.representation(using: .png, properties: [:])?.write(to: saveURL)
                         
-                    case "jpg", "jpeg", "JPG", "JPEG":
-                        // JPEG 使用高质量压缩
-                        let properties: [NSBitmapImageRep.PropertyKey: Any] = [
-                            .compressionFactor: 0.85,
-                            .progressive: true
-                        ]
-                        if let data = bitmapImage.representation(using: .jpeg, properties: properties) {
-                            try data.write(to: saveURL)
-                        }
+                    case "jpg", "jpeg":
+                        try bitmapImage.representation(
+                            using: .jpeg,
+                            properties: [.compressionFactor: 0.85]
+                        )?.write(to: saveURL)
                         
-                    case "tiff", "TIFF":
-                        // TIFF 使用LZW压缩
-                        let properties: [NSBitmapImageRep.PropertyKey: Any] = [
-                            .compressionMethod: NSBitmapImageRep.TIFFCompression.lzw
-                        ]
-                        if let data = bitmapImage.representation(using: .tiff, properties: properties) {
-                            try data.write(to: saveURL)
-                        }
+                    case "tiff":
+                        try bitmapImage.representation(
+                            using: .tiff,
+                            properties: [.compressionMethod: NSBitmapImageRep.TIFFCompression.lzw]
+                        )?.write(to: saveURL)
                         
                     default:
-                        // 其他格式默认使用高质量JPEG
-                        let properties: [NSBitmapImageRep.PropertyKey: Any] = [
-                            .compressionFactor: 0.85,
-                            .progressive: true
-                        ]
-                        if let data = bitmapImage.representation(using: .jpeg, properties: properties) {
-                            try data.write(to: saveURL)
-                        }
+                        // 默认使用 JPEG 格式
+                        try bitmapImage.representation(
+                            using: .jpeg,
+                            properties: [.compressionFactor: 0.85]
+                        )?.write(to: saveURL)
                     }
                 }
             }.value
