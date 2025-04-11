@@ -1,4 +1,5 @@
 //
+//
 //  ContentView.swift
 //  AddDatePrint
 //
@@ -29,6 +30,32 @@ class FontManagerDelegate: NSObject {
     }
 }
 
+// 将辅助函数移到 ContentView 外部
+private func showCenteredAlert(_ alert: NSAlert, relativeTo window: NSWindow) -> NSApplication.ModalResponse {
+    // 获取父窗口的屏幕坐标和大小
+    let parentFrame = window.frame
+    let alertWindow = alert.window
+    
+    // 计算父窗口的中心点（考虑屏幕坐标系）
+    let centerX = parentFrame.minX + (parentFrame.width / 2)
+    let centerY = parentFrame.minY + (parentFrame.height / 2)
+    
+    // 计算弹窗的位置（将弹窗的中心点对齐到父窗口的中心点）
+    let alertX = centerX - (alertWindow.frame.width / 2)
+    let alertY = centerY - (alertWindow.frame.height / 2)
+    
+    // 设置弹窗位置
+    alertWindow.setFrameOrigin(NSPoint(x: alertX, y: alertY))
+    
+    // 确保弹窗在父窗口之上
+    alertWindow.level = NSWindow.Level(rawValue: window.level.rawValue + 1)
+    
+    // 将弹窗设置为父窗口的子窗口
+    window.addChildWindow(alertWindow, ordered: .above)
+    
+    return alert.runModal()
+}
+
 struct ContentView: View {
     @State private var selectedImages: [URL] = []
     @State private var processedCount = 0
@@ -57,6 +84,9 @@ struct ContentView: View {
     @State private var isRefreshingWatermark: Bool = false
     @State private var showFontPanel: Bool = false
     @State private var ledFont: NSFont = NSFont.systemFont(ofSize: 24)
+    @State private var processProgress: Double = 0
+    @State private var currentProcessingFile: String = ""
+    @State private var currentTask: Task<Void, Never>?
     
     // 添加字体大小枚举
     enum FontSize: String, CaseIterable {
@@ -300,12 +330,12 @@ struct ContentView: View {
                             // 自定义颜色选择区域
                             ZStack {
                                 // 显示选择的自定义颜色
-                                if isCustomColor {
-                                    Circle()
-                                        .fill(Color(nsColor: selectedColor))
-                                        .frame(width: 30, height: 30)
-                                        .overlay(
-                                            Circle()
+                            if isCustomColor {
+                                Circle()
+                                    .fill(Color(nsColor: selectedColor))
+                                    .frame(width: 30, height: 30)
+                                    .overlay(
+                                        Circle()
                                                 .stroke(Color.accentColor, lineWidth: 2)
                                         )
                                 }
@@ -333,26 +363,18 @@ struct ContentView: View {
                     Button(action: {
                         processImages()
                     }) {
-                        HStack {
-                            if isProcessing {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                    .padding(.trailing, 5)
-                            }
-                            Text(isProcessing ? "处理中..." : "开始处理")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 36)
-                    }
-                    .buttonStyle(.borderedProminent)
+                        processButtonContent
+                }
+                .buttonStyle(.borderedProminent)
                     .disabled(selectedImages.isEmpty || isProcessing)
+                    .frame(maxWidth: .infinity)
                 }
                 .padding()
                 .background(Color(.textBackgroundColor))
                 .cornerRadius(12)
-                
-                Spacer()
-            }
+            
+            Spacer()
+        }
             .frame(minWidth: 300, maxWidth: 400)
             .padding()
             
@@ -383,7 +405,7 @@ struct ContentView: View {
                             VStack {
                                 ProgressView("更新水印...")
                             }
-                            .padding()
+                .padding()
                             .background(Color(.windowBackgroundColor).opacity(0.8))
                             .cornerRadius(8)
                         }
@@ -598,256 +620,359 @@ struct ContentView: View {
         let imageSize = originalImage.size
         
         Task {
-            // 在后台线程准备水印数据
-            let watermarkData = await Task.detached(priority: .userInitiated) { () -> Data? in
-                // 创建位图表示
-                let bitmapRep = NSBitmapImageRep(
-                    bitmapDataPlanes: nil,
-                    pixelsWide: Int(imageSize.width),
-                    pixelsHigh: Int(imageSize.height),
-                    bitsPerSample: 8,
-                    samplesPerPixel: 4,
-                    hasAlpha: true,
-                    isPlanar: false,
-                    colorSpaceName: .deviceRGB,
-                    bytesPerRow: 0,
-                    bitsPerPixel: 0
-                )
+            // 在主线程创建和更新水印层
+            await MainActor.run {
+                // 创建新的水印层
+                let layer = NSImage(size: imageSize)
+                layer.lockFocus()
                 
-                // 准备绘制属性
+                // 确保背景透明
+                NSColor.clear.set()
+                NSRect(origin: .zero, size: imageSize).fill()
+                
+                // 获取日期字符串
                 let dateString = dateFormatter.string(from: Date())
-                let adaptiveFontSize = calculateAdaptiveFontSize(for: imageSize)
+                
+                // 计算自适应大小
+                let adaptiveFontSize = calculateAdaptiveFontSize(for: imageSize, fontSize: selectedFontSize)
                 let adaptiveMargin = calculateAdaptiveMargin(for: imageSize)
                 
-                // 在主线程执行绘制操作
-                await MainActor.run {
-                    NSGraphicsContext.saveGraphicsState()
-                    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmapRep!)
-                    
-                    // 确保背景透明
-                    NSColor.clear.set()
-                    NSRect(origin: .zero, size: imageSize).fill()
-                    
-                    // 设置字体和颜色
-                    let fixedFont = NSFontManager.shared.convert(defaultFont, toSize: adaptiveFontSize)
-                    let attributes: [NSAttributedString.Key: Any] = [
-                        .font: fixedFont,
-                        .foregroundColor: selectedColor
-                    ]
-                    
-                    // 创建并绘制文字
-                    let attributedString = NSAttributedString(string: dateString, attributes: attributes)
-                    let stringSize = attributedString.size()
-                    
-                    attributedString.draw(at: NSPoint(
-                        x: imageSize.width - stringSize.width - adaptiveMargin,
-                        y: adaptiveMargin
-                    ))
-                    
-                    NSGraphicsContext.restoreGraphicsState()
-                }
+                // 设置字体和颜色
+                let fixedFont = NSFontManager.shared.convert(ledFont, toSize: adaptiveFontSize)
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: fixedFont,
+                    .foregroundColor: selectedColor
+                ]
                 
-                // 在后台线程处理图片数据
-                return bitmapRep?.representation(using: .png, properties: [:])
-            }.value
+                // 创建并绘制文字
+                let attributedString = NSAttributedString(string: dateString, attributes: attributes)
+                let stringSize = attributedString.size()
+                
+                attributedString.draw(at: NSPoint(
+                    x: imageSize.width - stringSize.width - adaptiveMargin,
+                    y: adaptiveMargin
+                ))
+                
+                layer.unlockFocus()
+                watermarkLayer = layer
+            }
             
             // 在主线程更新UI
             await MainActor.run {
-                if let watermarkData = watermarkData {
-                    watermarkLayer = NSImage(data: watermarkData)
-                }
                 isRefreshingWatermark = false
             }
         }
     }
     
-    private func processImages() {
-        guard !selectedImages.isEmpty else { return }
+    // 添加进度管理器
+    private actor ProcessingProgress {
+        private(set) var completed: Int = 0
+        private(set) var processing: Int = 0
+        private var total: Int
         
-        isProcessing = true
-        processedCount = 0
+        init(total: Int) {
+            self.total = total
+        }
         
-        let savePanel = NSSavePanel()
-        savePanel.allowedContentTypes = [.folder]
-        savePanel.nameFieldStringValue = "watermarked_images"
+        func incrementCompleted() -> (completed: Int, progress: Double) {
+            completed += 1
+            return (completed, Double(completed) / Double(total))
+        }
         
-        if savePanel.runModal() == .OK {
-            if let saveURL = savePanel.url {
-                let fileManager = FileManager.default
-                let imagesToProcess = selectedImages // 创建副本
-                
-                // 创建保存目录
-                do {
-                    try fileManager.createDirectory(at: saveURL, withIntermediateDirectories: true)
-                } catch {
-                    DispatchQueue.main.async {
-                        alertMessage = "创建保存目录失败：\(error.localizedDescription)"
-                        showAlert = true
-                        isProcessing = false
-                    }
-                    return
-                }
-                
-                // 在后台线程处理图片
-                DispatchQueue.global(qos: .userInitiated).async {
-                    var successCount = 0
-                    var failedCount = 0
-                    
-                    // 创建处理图片用的属性副本
-                    let currentFont = defaultFont
-                    let currentColor = selectedColor
-                    let currentDateFormatter = dateFormatter
-                    
-                    for imageURL in imagesToProcess {
-                        if let image = NSImage(contentsOf: imageURL) {
-                            let imageSize = image.size
-                            // 计算适应的字体大小
-                            let adaptiveFontSize = calculateAdaptiveFontSize(for: imageSize)
-                            let fixedFont = NSFontManager.shared.convert(currentFont, toSize: adaptiveFontSize)
-                            
-                            // 获取照片的创建时间
-                            if let resourceValues = try? imageURL.resourceValues(forKeys: [.creationDateKey]),
-                               let creationDate = resourceValues.creationDate {
-                                
-                                // 获取原始图片的实际尺寸
-                                let originalSize = image.size
-                                
-                                // 创建带有水印的图片
-                                let finalImage = NSImage(size: originalSize)
-                                finalImage.lockFocus()
-                                
-                                // 绘制原始图片
-                                image.draw(in: NSRect(origin: .zero, size: originalSize))
-                                
-                                // 绘制水印
-                                let dateString = currentDateFormatter.string(from: creationDate)
-                                
-                                let attributes: [NSAttributedString.Key: Any] = [
-                                    .font: fixedFont,
-                                    .foregroundColor: currentColor
-                                ]
-                                
-                                let attributedString = NSAttributedString(string: dateString, attributes: attributes)
-                                let stringSize = attributedString.size()
-                                
-                                // 计算自适应边距
-                                let adaptiveMargin = calculateAdaptiveMargin(for: imageSize)
-                                
-                                // 绘制文字，使用等比例边距
-                                attributedString.draw(at: NSPoint(
-                                    x: originalSize.width - stringSize.width - adaptiveMargin,
-                                    y: adaptiveMargin
-                                ))
-                                
-                                finalImage.unlockFocus()
-                                
-                                // 保存图片
-                                let fileName = imageURL.lastPathComponent
-                                let savePath = saveURL.appendingPathComponent(fileName)
-                                
-                                // 根据原始图片格式决定保存格式
-                                let imageFormat: NSBitmapImageRep.FileType = imageURL.pathExtension.lowercased() == "heic" ? .jpeg : .png
-                                
-                                if let tiffData = finalImage.tiffRepresentation,
-                                   let bitmapImage = NSBitmapImageRep(data: tiffData) {
-                                    // 设置正确的像素密度
-                                    bitmapImage.size = originalSize
-                                    
-                                    // 获取原始图片的像素尺寸
-                                    if let originalImage = NSImage(contentsOf: imageURL),
-                                       let originalRep = originalImage.representations.first {
-                                        // 直接使用原始图片的像素尺寸
-                                        let pixelsWide = originalRep.pixelsWide
-                                        let pixelsHigh = originalRep.pixelsHigh
-                                        
-                                        // 创建新的位图表示，使用原始像素尺寸
-                                        if let newBitmapImage = NSBitmapImageRep(
-                                            bitmapDataPlanes: nil,
-                                            pixelsWide: pixelsWide,
-                                            pixelsHigh: pixelsHigh,
-                                            bitsPerSample: 8,
-                                            samplesPerPixel: 4,
-                                            hasAlpha: true,
-                                            isPlanar: false,
-                                            colorSpaceName: .deviceRGB,
-                                            bytesPerRow: 0,
-                                            bitsPerPixel: 0
-                                        ) {
-                                            // 将原始图片绘制到新的位图表示上
-                                            NSGraphicsContext.saveGraphicsState()
-                                            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: newBitmapImage)
-                                            finalImage.draw(in: NSRect(x: 0, y: 0, width: pixelsWide, height: pixelsHigh))
-                                            NSGraphicsContext.restoreGraphicsState()
-                                            
-                                            // 保存新创建的位图表示
-                                            if let imageData = newBitmapImage.representation(using: imageFormat, properties: [:]) {
-                                                do {
-                                                    try imageData.write(to: savePath)
-                                                    successCount += 1
-                                                } catch {
-                                                    print("保存图片失败：\(error.localizedDescription)")
-                                                    failedCount += 1
-                                                }
-                                            } else {
-                                                failedCount += 1
-                                            }
-                                        } else {
-                                            failedCount += 1
-                                        }
-                                    } else {
-                                        // 如果无法获取原始像素尺寸，使用默认方法
-                                        if let imageData = bitmapImage.representation(using: imageFormat, properties: [:]) {
-                                            do {
-                                                try imageData.write(to: savePath)
-                                                successCount += 1
-                                            } catch {
-                                                print("保存图片失败：\(error.localizedDescription)")
-                                                failedCount += 1
-                                            }
-                                        } else {
-                                            failedCount += 1
-                                        }
-                                    }
-                                } else {
-                                    failedCount += 1
-                                }
-                            } else {
-                                failedCount += 1
-                            }
-                        } else {
-                            failedCount += 1
-                        }
-                        
-                        // 在主线程更新进度
-                        DispatchQueue.main.async {
-                            processedCount += 1
-                        }
-                    }
-                    
-                    // 在主线程更新 UI
-                    DispatchQueue.main.async {
-                        alertMessage = "处理完成：成功保存 \(successCount) 张照片"
-                        if failedCount > 0 {
-                            alertMessage += "，\(failedCount) 张照片处理失败"
-                        }
-                        showAlert = true
-                        isProcessing = false
-                        selectedImages.removeAll()
-                        processedCount = 0
-                    }
-                }
-            }
-        } else {
-            isProcessing = false
+        func incrementProcessing() {
+            processing += 1
+        }
+        
+        func decrementProcessing() {
+            processing -= 1
+        }
+        
+        var isProcessingFull: Bool {
+            processing >= 4 // 最大并发数
         }
     }
     
+    // 修改处理函数
+    private func processImages() {
+        guard !selectedImages.isEmpty else { return }
+        
+        Task { @MainActor in
+            isProcessing = true
+            processProgress = 0
+            processedCount = 0
+            
+            let panel = NSSavePanel()
+            panel.title = "选择保存位置"
+            panel.canCreateDirectories = true
+            panel.canSelectHiddenExtension = true
+            panel.prompt = "选择"
+            panel.nameFieldStringValue = "未命名"
+            
+            let response = await panel.beginSheetModal(for: NSApp.keyWindow!)
+            let saveURL = response == .OK ? panel.url : nil
+            
+            if let saveURL = saveURL {
+                currentTask = Task {
+                    do {
+                        let processParams = ProcessParams(
+                            dateString: dateFormatter.string(from: Date()),
+                            color: selectedColor,
+                            font: ledFont,
+                            fontSize: selectedFontSize,
+                            outputDir: saveURL
+                        )
+                        
+                        let progress = ProcessingProgress(total: selectedImages.count)
+                        
+                        try await withThrowingTaskGroup(of: Void.self) { group in
+                            for imageURL in selectedImages {
+                                try Task.checkCancellation()
+                                
+                                while await progress.isProcessingFull {
+                                    try await Task.sleep(nanoseconds: 100_000_000)
+                                }
+                                
+                                await progress.incrementProcessing()
+                                
+                                group.addTask {
+                                    try Task.checkCancellation()
+                                    
+                                    await MainActor.run {
+                                        currentProcessingFile = imageURL.lastPathComponent
+                                    }
+                                    
+                                    try await processImage(imageURL, with: processParams)
+                                    
+                                    // 获取进度信息
+                                    let (completed, newProgress) = await progress.incrementCompleted()
+                                    await progress.decrementProcessing()
+                                    
+                                    // 更新UI
+                                    await MainActor.run {
+                                        processedCount = completed
+                                        processProgress = newProgress
+                                    }
+                                }
+                            }
+                            
+                            try await group.waitForAll()
+                        }
+                        
+                        // 在主线程显示完成提示
+                        await MainActor.run {
+                            if let window = NSApp.keyWindow {
+                                let alert = NSAlert()
+                                alert.messageText = "处理完成"
+                                alert.informativeText = "已成功处理 \(selectedImages.count) 张图片\n保存位置：\(saveURL.path)"
+                                alert.alertStyle = .informational
+                                alert.addButton(withTitle: "确定")
+                                alert.addButton(withTitle: "打开文件夹")
+                                
+                                let response = showCenteredAlert(alert, relativeTo: window)
+                                if response == .alertSecondButtonReturn {
+                                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: saveURL.path)
+                                }
+                            }
+                        }
+                        
+                    } catch is CancellationError {
+                        print("Task was cancelled")
+                    } catch {
+                        await MainActor.run {
+                            if let window = NSApp.keyWindow {
+                                let alert = NSAlert()
+                                alert.messageText = "处理出错"
+                                alert.informativeText = error.localizedDescription
+                                alert.alertStyle = .warning
+                                alert.addButton(withTitle: "确定")
+                                
+                                _ = showCenteredAlert(alert, relativeTo: window)
+                            }
+                        }
+                    }
+                    
+                    await MainActor.run {
+                        isProcessing = false
+                        processedCount = 0
+                        currentProcessingFile = ""
+                        currentTask = nil
+                    }
+                }
+            } else {
+                isProcessing = false
+                currentTask = nil
+            }
+        }
+    }
+    
+    // 处理参数结构体
+    private struct ProcessParams {
+        let dateString: String
+        let color: NSColor
+        let font: NSFont
+        let fontSize: FontSize
+        let outputDir: URL
+    }
+    
+    // 处理单张图片
+    private func processImage(_ imageURL: URL, with params: ProcessParams) async throws {
+        guard let image = await loadImageInBackground(imageURL) else { return }
+        
+        let imageSize = image.size
+        let fileExtension = imageURL.pathExtension.lowercased()
+        
+        // 创建新图像并添加水印
+        let newImage = await Task.detached(priority: .userInitiated) { () -> NSImage? in
+            let result = NSImage(size: imageSize)
+            result.lockFocus()
+            
+            // 绘制原始图像
+            image.draw(in: NSRect(origin: .zero, size: imageSize))
+            
+            // 计算自适应大小
+            let adaptiveFontSize = calculateAdaptiveFontSize(for: imageSize, fontSize: params.fontSize)
+            let adaptiveMargin = calculateAdaptiveMargin(for: imageSize)
+            
+            // 设置字体和颜色
+            let fixedFont = NSFontManager.shared.convert(params.font, toSize: adaptiveFontSize)
+                                let attributes: [NSAttributedString.Key: Any] = [
+                                    .font: fixedFont,
+                .foregroundColor: params.color
+                                ]
+                                
+            // 创建并绘制文字
+            let attributedString = NSAttributedString(string: params.dateString, attributes: attributes)
+                                let stringSize = attributedString.size()
+                                
+                                attributedString.draw(at: NSPoint(
+                x: imageSize.width - stringSize.width - adaptiveMargin,
+                y: adaptiveMargin
+                                ))
+                                
+            result.unlockFocus()
+            return result
+        }.value
+                                
+        // 保存图像
+        if let newImage = newImage {
+            try await Task.detached(priority: .userInitiated) {
+                                let fileName = imageURL.lastPathComponent
+                let saveURL = params.outputDir.appendingPathComponent(fileName)
+                
+                // 确保目录存在
+                try FileManager.default.createDirectory(
+                    at: params.outputDir,
+                    withIntermediateDirectories: true,
+                    attributes: nil
+                )
+                
+                if let tiffData = newImage.tiffRepresentation,
+                                   let bitmapImage = NSBitmapImageRep(data: tiffData) {
+                    
+                    switch fileExtension {
+                    case "heic", "HEIC":
+                        // 对于 HEIC 格式，使用 ImageIO 框架处理
+                        if let cgImage = newImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                            // 确保文件扩展名大小写匹配原文件
+                            let originalExtension = imageURL.pathExtension
+                            let saveURLWithCorrectExtension = params.outputDir.appendingPathComponent(
+                                imageURL.deletingPathExtension().lastPathComponent
+                            ).appendingPathExtension(originalExtension)
+                            
+                            guard let destination = CGImageDestinationCreateWithURL(
+                                saveURLWithCorrectExtension as CFURL,
+                                UTType.heic.identifier as CFString,
+                                1,
+                                nil
+                            ) else {
+                                print("Failed to create CGImageDestination")
+                                return
+                            }
+                            
+                            // 设置 HEIC 压缩参数
+                            let options: [CFString: Any] = [
+                                kCGImageDestinationLossyCompressionQuality: 0.85,
+                                kCGImageDestinationOptimizeColorForSharing: true,
+                                kCGImageDestinationImageMaxPixelSize: max(imageSize.width, imageSize.height)
+                            ]
+                            
+                            CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
+                            if !CGImageDestinationFinalize(destination) {
+                                print("Failed to finalize image destination")
+                            }
+                        }
+                        
+                    case "png":
+                        // PNG 使用无损压缩
+                        let properties: [NSBitmapImageRep.PropertyKey: Any] = [:]
+                        if let data = bitmapImage.representation(using: .png, properties: properties) {
+                            try data.write(to: saveURL)
+                        }
+                        
+                    case "jpg", "jpeg", "JPG", "JPEG":
+                        // JPEG 使用高质量压缩
+                        let properties: [NSBitmapImageRep.PropertyKey: Any] = [
+                            .compressionFactor: 0.85,
+                            .progressive: true
+                        ]
+                        if let data = bitmapImage.representation(using: .jpeg, properties: properties) {
+                            try data.write(to: saveURL)
+                        }
+                        
+                    case "tiff", "TIFF":
+                        // TIFF 使用LZW压缩
+                        let properties: [NSBitmapImageRep.PropertyKey: Any] = [
+                            .compressionMethod: NSBitmapImageRep.TIFFCompression.lzw
+                        ]
+                        if let data = bitmapImage.representation(using: .tiff, properties: properties) {
+                            try data.write(to: saveURL)
+                        }
+                        
+                    default:
+                        // 其他格式默认使用高质量JPEG
+                        let properties: [NSBitmapImageRep.PropertyKey: Any] = [
+                            .compressionFactor: 0.85,
+                            .progressive: true
+                        ]
+                        if let data = bitmapImage.representation(using: .jpeg, properties: properties) {
+                            try data.write(to: saveURL)
+                        }
+                    }
+                }
+            }.value
+        }
+    }
+    
+    // 更新处理按钮显示进度
+    private var processButtonContent: some View {
+        HStack {
+            if isProcessing {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .controlSize(.small)
+                    VStack(alignment: .center, spacing: 2) {
+                        Text("处理中... \(Int(processProgress * 100))%")
+                        Text(currentProcessingFile)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                            }
+                        } else {
+                Text("开始处理")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(height: 36)
+    }
+    
     // 计算自适应字体大小的函数
-    private func calculateAdaptiveFontSize(for imageSize: CGSize) -> CGFloat {
+    private func calculateAdaptiveFontSize(for imageSize: CGSize, fontSize: FontSize) -> CGFloat {
         // 使用图片对角线长度作为参考
         let diagonalLength = sqrt(pow(imageSize.width, 2) + pow(imageSize.height, 2))
         // 根据选择的大小计算字体大小
-        let adaptiveFontSize = diagonalLength * selectedFontSize.scaleFactor
+        let adaptiveFontSize = diagonalLength * fontSize.scaleFactor
         
         // 限制最小和最大字体大小
         let minFontSize: CGFloat = 16
@@ -892,7 +1017,7 @@ struct ContentView: View {
                 let preview = NSImage(size: imageSize)
                 
                 return await withCheckedContinuation { continuation in
-                    DispatchQueue.main.async {
+                        DispatchQueue.main.async {
                         preview.lockFocus()
                         
                         // 绘制原始图像
@@ -902,11 +1027,11 @@ struct ContentView: View {
                         let dateString = dateFormatter.string(from: Date())
                         
                         // 计算自适应大小
-                        let adaptiveFontSize = calculateAdaptiveFontSize(for: imageSize)
+                        let adaptiveFontSize = calculateAdaptiveFontSize(for: imageSize, fontSize: selectedFontSize)
                         let adaptiveMargin = calculateAdaptiveMargin(for: imageSize)
                         
                         // 设置字体和颜色
-                        let fixedFont = NSFontManager.shared.convert(defaultFont, toSize: adaptiveFontSize)
+                        let fixedFont = NSFontManager.shared.convert(selectedFont, toSize: adaptiveFontSize)
                         let attributes: [NSAttributedString.Key: Any] = [
                             .font: fixedFont,
                             .foregroundColor: selectedColor
@@ -927,8 +1052,8 @@ struct ContentView: View {
                     }
                 }
             }.value
-            
-            // 在主线程更新 UI
+                    
+                    // 在主线程更新 UI
             await MainActor.run {
                 previewImage = preview
                 isGeneratingPreview = false
@@ -1059,6 +1184,26 @@ struct ColorPickerView: View {
         }
         .frame(width: 300)
         .padding()
+    }
+}
+
+// 添加辅助扩展
+extension NSBitmapImageRep.FileType {
+    init?(rawValue: String) {
+        switch rawValue.lowercased() {
+        case "jpg", "jpeg":
+            self = .jpeg
+        case "png":
+            self = .png
+        case "gif":
+            self = .gif
+        case "tiff":
+            self = .tiff
+        case "bmp":
+            self = .bmp
+        default:
+            return nil
+        }
     }
 }
 
