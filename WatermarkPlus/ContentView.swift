@@ -264,7 +264,7 @@ struct ContentView: View {
                 }
                 
                 if isProcessing {
-                    ProgressView("正在处理...", value: Double(processedCount), total: Double(selectedImages.count))
+                    ProgressView("正在处理".localized, value: Double(processedCount), total: Double(selectedImages.count))
                         .progressViewStyle(.linear)
                 } else {
                     ProgressView("", value: 0, total: 1)
@@ -1031,15 +1031,15 @@ struct ContentView: View {
                         .scaleEffect(0.8)
                         .controlSize(.small)
                     VStack(alignment: .center, spacing: 2) {
-                        Text("处理中... \(Int(processProgress * 100))%")
+                        Text("处理中...".localizedFormat(Int(processProgress * 100)))
                         Text(currentProcessingFile)
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
-                            }
-                        } else {
-                Text("开始处理")
+                }
+            } else {
+                Text("开始处理".localized)
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
@@ -1189,15 +1189,15 @@ struct FontPickerView: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            Text("选择字体")
+            Text("选择字体".localized)
                 .font(.headline)
             
             // 显示当前选择的字体名称
-            Text(selectedFont.displayName ?? "未选择字体")
+            Text(selectedFont.displayName ?? "未选择字体".localized)
                 .font(.system(size: 16))
             
             // 预览区域
-            Text("预览文字 ABC abc 123")
+            Text("预览文字".localized)
                 .font(Font(selectedFont))
                 .padding()
                 .frame(maxWidth: .infinity)
@@ -1205,7 +1205,7 @@ struct FontPickerView: View {
                 .cornerRadius(8)
             
             // 字体选择按钮
-            Button("打开字体选择器") {
+            Button("打开字体选择器".localized) {
                 NSFontPanel.shared.setPanelFont(selectedFont, isMultiple: false)
                 NSFontPanel.shared.orderFront(nil)
             }
@@ -1243,7 +1243,7 @@ struct ColorPickerView: View {
     
     var body: some View {
         VStack {
-            ColorPicker("选择颜色", selection: Binding(
+            ColorPicker("选择颜色".localized, selection: Binding(
                 get: { Color(nsColor: selectedColor) },
                 set: { selectedColor = NSColor($0) }
             ))

@@ -19,7 +19,8 @@
 
 // UI Elements
 "开始处理" = "Start Processing";
-"处理中..." = "Processing...";
+"处理中..." = "Processing... %d%%";
+"正在处理" = "Processing...";
 "选择保存位置" = "Select Save Location";
 "选择" = "Select";
 "未命名" = "Untitled";

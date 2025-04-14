@@ -1,46 +1,54 @@
 // 按钮和标签
-"Start Processing" = "开始处理";
-"Processing..." = "处理中...";
-"Select Save Location" = "选择保存位置";
-"Select" = "选择";
-"Untitled" = "未命名";
-"Open Folder" = "打开文件夹";
-"OK" = "确定";
-"Cancel" = "取消";
-"Watermark Color" = "水印颜色";
-"Font Size" = "字体大小";
-"Custom Date Format" = "自定义日期格式";
-"Enter Date Format" = "输入日期格式";
-"Format Description" = "格式说明：\nyyyy - 年份\nMM - 月份\ndd - 日期";
+"开始处理" = "开始处理";
+"选择保存位置" = "选择保存位置";
+"选择" = "选择";
+"未命名" = "未命名";
+"打开文件夹" = "打开文件夹";
+"确定" = "确定";
+"取消" = "取消";
+"水印颜色" = "水印颜色";
+"字体大小" = "字体大小";
+"自定义日期格式" = "自定义日期格式";
+"输入日期格式" = "输入日期格式";
+"格式说明" = "格式说明：\nyyyy - 年份\nMM - 月份\ndd - 日期";
 
 // 字体大小
-"Small" = "小";
-"Medium" = "中";
-"Large" = "大";
+"小" = "小";
+"中" = "中";
+"大" = "大";
 
 // 日期格式
-"Date Format" = "日期格式";
-"Standard" = "标准";
-"Concise" = "简洁";
-"Slash" = "斜杠";
-"Dot" = "点号";
+"日期格式" = "日期格式";
+"标准" = "标准";
+"简洁" = "简洁";
+"斜杠" = "斜杠";
+"点号" = "点号";
 
 // 颜色预设
-"Kodak Yellow" = "柯达黄";
-"Orange Red" = "橙红";
-"Rose Pink" = "玫红";
-"Sky Blue" = "天蓝";
-"Emerald" = "翠绿";
+"柯达黄" = "柯达黄";
+"橙红" = "橙红";
+"玫红" = "玫红";
+"天蓝" = "天蓝";
+"翠绿" = "翠绿";
 
 // 提示和消息
-"Processing Complete" = "处理完成";
-"Processing Error" = "处理出错";
-"Successfully processed %d images\nSave location: %@" = "已成功处理 %d 张图片\n保存位置：%@";
-"Cannot load image: %@" = "无法加载图片：%@";
-"Cannot load HEIC image: %@" = "无法加载HEIC图片：%@";
-"Please select images to preview watermark effect" = "请选择图片以预览水印效果";
-"Drop photos or folders here\nor click to select" = "拖放照片或文件夹到这里\n或点击选择";
-"Selected %d photos" = "已选择 %d 张照片";
-"Loading image..." = "加载图片中...";
-"Updating watermark..." = "更新水印...";
-"Failed to finalize HEIC image" = "保存HEIC图片失败"; 
+"处理完成" = "处理完成";
+"处理出错" = "处理出错";
+"成功处理图片" = "已成功处理 %d 张图片\n保存位置：%@";
+"无法加载图片" = "无法加载图片：%@";
+"无法加载HEIC图片" = "无法加载HEIC图片：%@";
+"请选择图片预览" = "请选择图片以预览水印效果";
+"拖放提示" = "拖放照片或文件夹到这里\n或点击选择";
+"已选择照片" = "已选择 %d 张照片";
+"加载图片中" = "加载图片中...";
+"更新水印" = "更新水印...";
+"保存HEIC失败" = "保存HEIC图片失败";
+
+// 处理进度
+"处理中..." = "处理中... %d%%";
+"正在处理" = "正在处理...";
+"选择字体" = "选择字体";
+"未选择字体" = "未选择字体";
+"预览文字" = "预览文字 ABC abc 123";
+"打开字体选择器" = "打开字体选择器";
+"选择颜色" = "选择颜色"; 
