@@ -13,10 +13,11 @@
 		675BF04F2DA69143009442D4 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 675BF04E2DA69143009442D4 /* Preview Assets.xcassets */; };
 		675BF0572DA69172009442D4 /* led-digital-7-1.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 675BF0562DA69172009442D4 /* led-digital-7-1.ttf */; };
 		675BF05B2DA82046009442D4 /* Digital-Dismay-1.otf in Resources */ = {isa = PBXBuildFile; fileRef = 675BF05A2DA82046009442D4 /* Digital-Dismay-1.otf */; };
+		675BF07F2DAD5F42009442D4 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 675BF07D2DAD5F42009442D4 /* Localizable.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		675BF0442DA69141009442D4 /* WatermarkPlus.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WatermarkPlus.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		675BF0442DA69141009442D4 /* WatermarkPlus+.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "WatermarkPlus+.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		675BF0472DA69141009442D4 /* WatermarkPlusApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatermarkPlusApp.swift; sourceTree = "<group>"; };
 		675BF0492DA69141009442D4 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		675BF04B2DA69143009442D4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -25,6 +26,8 @@
 		675BF0562DA69172009442D4 /* led-digital-7-1.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "led-digital-7-1.ttf"; sourceTree = "<group>"; };
 		675BF0582DA6917A009442D4 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		675BF05A2DA82046009442D4 /* Digital-Dismay-1.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Digital-Dismay-1.otf"; sourceTree = "<group>"; };
+		675BF07E2DAD5F42009442D4 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		675BF0802DAD5F4C009442D4 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -49,7 +52,7 @@
 		675BF0452DA69141009442D4 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				675BF0442DA69141009442D4 /* WatermarkPlus.app */,
+				675BF0442DA69141009442D4 /* WatermarkPlus+.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -63,6 +66,7 @@
 				675BF0562DA69172009442D4 /* led-digital-7-1.ttf */,
 				675BF05A2DA82046009442D4 /* Digital-Dismay-1.otf */,
 				675BF0582DA6917A009442D4 /* Info.plist */,
+				675BF07D2DAD5F42009442D4 /* Localizable.strings */,
 				675BF0502DA69143009442D4 /* WatermarkPlus.entitlements */,
 				675BF04D2DA69143009442D4 /* Preview Content */,
 			);
@@ -94,7 +98,7 @@
 			);
 			name = WatermarkPlus;
 			productName = WatermarkPlus;
-			productReference = 675BF0442DA69141009442D4 /* WatermarkPlus.app */;
+			productReference = 675BF0442DA69141009442D4 /* WatermarkPlus+.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -114,11 +118,12 @@
 			};
 			buildConfigurationList = 675BF03F2DA69141009442D4 /* Build configuration list for PBXProject "WatermarkPlus" */;
 			compatibilityVersion = "Xcode 14.0";
-			developmentRegion = en;
+			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
 			);
 			mainGroup = 675BF03B2DA69141009442D4;
 			productRefGroup = 675BF0452DA69141009442D4 /* Products */;
@@ -135,6 +140,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				675BF07F2DAD5F42009442D4 /* Localizable.strings in Resources */,
 				675BF04F2DA69143009442D4 /* Preview Assets.xcassets in Resources */,
 				675BF0572DA69172009442D4 /* led-digital-7-1.ttf in Resources */,
 				675BF04C2DA69143009442D4 /* Assets.xcassets in Resources */,
@@ -155,6 +161,18 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		675BF07D2DAD5F42009442D4 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				675BF07E2DAD5F42009442D4 /* en */,
+				675BF0802DAD5F4C009442D4 /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		675BF0512DA69143009442D4 /* Debug */ = {
@@ -283,7 +301,7 @@
 				CODE_SIGN_ENTITLEMENTS = WatermarkPlus/WatermarkPlus.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_ASSET_PATHS = "\"WatermarkPlus/Preview Content\"";
 				DEVELOPMENT_TEAM = 7U634AK5AY;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -296,9 +314,9 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ease.WatermarkPlus;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "WatermarkPlus+";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -312,7 +330,7 @@
 				CODE_SIGN_ENTITLEMENTS = WatermarkPlus/WatermarkPlus.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_ASSET_PATHS = "\"WatermarkPlus/Preview Content\"";
 				DEVELOPMENT_TEAM = 7U634AK5AY;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -325,9 +343,9 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ease.WatermarkPlus;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "WatermarkPlus+";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};

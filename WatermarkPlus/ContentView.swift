@@ -12,6 +12,16 @@ import UniformTypeIdentifiers
 import AppKit
 import CoreText
 
+extension String {
+    var localized: String {
+        NSLocalizedString(self, comment: "")
+    }
+    
+    func localizedFormat(_ args: CVarArg...) -> String {
+        String(format: self.localized, arguments: args)
+    }
+}
+
 // 添加字体管理器委托类
 class FontManagerDelegate: NSObject {
     static let shared = FontManagerDelegate()
@@ -90,9 +100,13 @@ struct ContentView: View {
     
     // 添加字体大小枚举
     enum FontSize: String, CaseIterable {
-        case small = "小"
-        case medium = "中"
-        case large = "大"
+        case small = "Small"
+        case medium = "Medium"
+        case large = "Large"
+        
+        var localizedName: String {
+            rawValue.localized
+        }
         
         var scaleFactor: Double {
             switch self {
@@ -114,19 +128,19 @@ struct ContentView: View {
     
     // 预设日期格式
     private let presetDateFormats: [(name: String, format: String)] = [
-        ("标准", "yyyy-MM-dd"),
-        ("简洁", "yy.MM.dd"),
-        ("斜杠", "yyyy/MM/dd"),
-        ("点号", "yyyy.MM.dd")
+        ("标准".localized, "yyyy-MM-dd"),
+        ("简洁".localized, "yy.MM.dd"),
+        ("斜杠".localized, "yyyy/MM/dd"),
+        ("点号".localized, "yyyy.MM.dd")
     ]
     
-    // 预设颜色（高饱和度）
+    // 预设颜色
     private let presetColors: [(name: String, color: NSColor)] = [
-        ("柯达黄", NSColor(red: 1.0, green: 0.85, blue: 0.0, alpha: 1.0)),    // 柯达胶卷经典黄
-        ("橙红", NSColor(red: 1.0, green: 0.2, blue: 0.0, alpha: 1.0)),   // 明亮的黄色
-        ("玫红", NSColor(red: 1.0, green: 0.2, blue: 0.6, alpha: 1.0)),    // 鲜艳的玫红色
-        ("天蓝", NSColor(red: 0.2, green: 0.6, blue: 1.0, alpha: 1.0)),   // 纯净的蓝色
-        ("翠绿", NSColor(red: 0.2, green: 0.8, blue: 0.2, alpha: 1.0))   // 鲜艳的绿色
+        ("柯达黄".localized, NSColor(red: 1.0, green: 0.85, blue: 0.0, alpha: 1.0)),
+        ("橙红".localized, NSColor(red: 1.0, green: 0.2, blue: 0.0, alpha: 1.0)),
+        ("玫红".localized, NSColor(red: 1.0, green: 0.2, blue: 0.6, alpha: 1.0)),
+        ("天蓝".localized, NSColor(red: 0.2, green: 0.6, blue: 1.0, alpha: 1.0)),
+        ("翠绿".localized, NSColor(red: 0.2, green: 0.8, blue: 0.2, alpha: 1.0))
     ]
     
     // 支持的图片格式
@@ -188,7 +202,7 @@ struct ContentView: View {
                     Image(systemName: "photo.on.rectangle")
                         .font(.system(size: 40))
                         .foregroundColor(.gray)
-                            Text("拖放照片或文件夹到这里\n或点击选择")
+                            Text("拖放照片或文件夹到这里\n或点击选择".localized)
                         .multilineTextAlignment(.center)
                         .foregroundColor(.gray)
                 }
@@ -241,7 +255,7 @@ struct ContentView: View {
             // 状态信息区域
             VStack(spacing: 5) {
                 if !selectedImages.isEmpty {
-                    Text("已选择 \(selectedImages.count) 张照片")
+                    Text("已选择 %d 张照片".localizedFormat(selectedImages.count))
                         .font(.headline)
                 } else {
                     Text("")
@@ -265,7 +279,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 15) {
                     // 日期格式选择
                     VStack(alignment: .leading) {
-                        Text("日期格式")
+                        Text("日期格式".localized)
                             .font(.headline)
                         HStack {
                         ForEach(presetDateFormats, id: \.name) { preset in
@@ -286,7 +300,7 @@ struct ContentView: View {
                 
                     // 添加字体大小选择
                     VStack(alignment: .leading) {
-                        Text("字体大小")
+                        Text("字体大小".localized)
                         .font(.headline)
                             HStack {
                             ForEach(FontSize.allCases, id: \.self) { size in
@@ -294,7 +308,7 @@ struct ContentView: View {
                                     selectedFontSize = size
                                     updateWatermarkLayer()
                                 }) {
-                                    Text(size.rawValue)
+                                    Text(size.localizedName)
                                         .frame(width: 60, height: 30)
                                         .background(selectedFontSize == size ? Color.accentColor : Color.clear)
                                         .foregroundColor(selectedFontSize == size ? .white : .primary)
@@ -307,7 +321,7 @@ struct ContentView: View {
                     
                     // 颜色选择
                     VStack(alignment: .leading) {
-                    Text("水印颜色")
+                    Text("水印颜色".localized)
                         .font(.headline)
                         HStack {
                         ForEach(presetColors, id: \.name) { preset in
@@ -466,7 +480,7 @@ struct ContentView: View {
             // 关闭字体面板
             NSFontPanel.shared.orderOut(nil)
         }
-        .alert("处理完成", isPresented: $showAlert) {
+        .alert("处理完成".localized, isPresented: $showAlert) {
             Button("确定", role: .cancel) { }
         } message: {
             Text(alertMessage)
@@ -481,7 +495,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showDateFormatPicker) {
             VStack(spacing: 20) {
-                Text("自定义日期格式")
+                Text("自定义日期格式".localized)
                     .font(.headline)
                     .padding(.top)
                 
@@ -711,11 +725,11 @@ struct ContentView: View {
             processedCount = 0
             
             let panel = NSSavePanel()
-            panel.title = "选择保存位置"
+            panel.title = "选择保存位置".localized
             panel.canCreateDirectories = true
             panel.canSelectHiddenExtension = true
-            panel.prompt = "选择"
-            panel.nameFieldStringValue = "未命名"
+            panel.prompt = "选择".localized
+            panel.nameFieldStringValue = "未命名".localized
             
             let response = await panel.beginSheetModal(for: NSApp.keyWindow!)
             let saveURL = response == .OK ? panel.url : nil
@@ -771,11 +785,11 @@ struct ContentView: View {
                         await MainActor.run {
                             if let window = NSApp.keyWindow {
                                 let alert = NSAlert()
-                                alert.messageText = "处理完成"
-                                alert.informativeText = "已成功处理 \(selectedImages.count) 张图片\n保存位置：\(saveURL.path)"
+                                alert.messageText = "处理完成".localized
+                                alert.informativeText = "已成功处理 %d 张图片\n保存位置：%@".localizedFormat(selectedImages.count, saveURL.path)
                                 alert.alertStyle = .informational
-                                alert.addButton(withTitle: "确定")
-                                alert.addButton(withTitle: "打开文件夹")
+                                alert.addButton(withTitle: "确定".localized)
+                                alert.addButton(withTitle: "打开文件夹".localized)
                                 
                                 let response = showCenteredAlert(alert, relativeTo: window)
                                 if response == .alertSecondButtonReturn {
@@ -790,10 +804,10 @@ struct ContentView: View {
                         await MainActor.run {
                             if let window = NSApp.keyWindow {
                                 let alert = NSAlert()
-                                alert.messageText = "处理出错"
+                                alert.messageText = "处理出错".localized
                                 alert.informativeText = error.localizedDescription
                                 alert.alertStyle = .warning
-                                alert.addButton(withTitle: "确定")
+                                alert.addButton(withTitle: "确定".localized)
                                 
                                 _ = showCenteredAlert(alert, relativeTo: window)
                             }
@@ -836,7 +850,7 @@ struct ContentView: View {
                 throw NSError(
                     domain: "WatermarkPlus",
                     code: 500,
-                    userInfo: [NSLocalizedDescriptionKey: "无法加载HEIC图片：\(imageURL.lastPathComponent)"]
+                    userInfo: [NSLocalizedDescriptionKey: "无法加载HEIC图片：%@".localizedFormat(imageURL.lastPathComponent)]
                 )
             }
             
@@ -858,7 +872,7 @@ struct ContentView: View {
                 throw NSError(
                     domain: "WatermarkPlus",
                     code: 500,
-                    userInfo: [NSLocalizedDescriptionKey: "无法加载图片：\(imageURL.lastPathComponent)"]
+                    userInfo: [NSLocalizedDescriptionKey: "无法加载图片：%@".localizedFormat(imageURL.lastPathComponent)]
                 )
             }
             image = loadedImage

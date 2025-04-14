@@ -1,0 +1,46 @@
+// 按钮和标签
+"Start Processing" = "开始处理";
+"Processing..." = "处理中...";
+"Select Save Location" = "选择保存位置";
+"Select" = "选择";
+"Untitled" = "未命名";
+"Open Folder" = "打开文件夹";
+"OK" = "确定";
+"Cancel" = "取消";
+"Watermark Color" = "水印颜色";
+"Font Size" = "字体大小";
+"Custom Date Format" = "自定义日期格式";
+"Enter Date Format" = "输入日期格式";
+"Format Description" = "格式说明：\nyyyy - 年份\nMM - 月份\ndd - 日期";
+
+// 字体大小
+"Small" = "小";
+"Medium" = "中";
+"Large" = "大";
+
+// 日期格式
+"Date Format" = "日期格式";
+"Standard" = "标准";
+"Concise" = "简洁";
+"Slash" = "斜杠";
+"Dot" = "点号";
+
+// 颜色预设
+"Kodak Yellow" = "柯达黄";
+"Orange Red" = "橙红";
+"Rose Pink" = "玫红";
+"Sky Blue" = "天蓝";
+"Emerald" = "翠绿";
+
+// 提示和消息
+"Processing Complete" = "处理完成";
+"Processing Error" = "处理出错";
+"Successfully processed %d images\nSave location: %@" = "已成功处理 %d 张图片\n保存位置：%@";
+"Cannot load image: %@" = "无法加载图片：%@";
+"Cannot load HEIC image: %@" = "无法加载HEIC图片：%@";
+"Please select images to preview watermark effect" = "请选择图片以预览水印效果";
+"Drop photos or folders here\nor click to select" = "拖放照片或文件夹到这里\n或点击选择";
+"Selected %d photos" = "已选择 %d 张照片";
+"Loading image..." = "加载图片中...";
+"Updating watermark..." = "更新水印...";
+"Failed to finalize HEIC image" = "保存HEIC图片失败"; 
