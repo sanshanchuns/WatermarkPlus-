@@ -1188,36 +1188,67 @@ struct ContentView: View {
                     }
                     
                 case "gif":
-                    // 设置 GIF 输出选项
-                    let gifProperties: [NSBitmapImageRep.PropertyKey: Any] = [
-                        .compressionFactor: 1.0,
-                        .interlaced: false
-                    ]
-                    
                     // 添加调试信息
                     print("GIF 输出调试信息:")
                     print("原始图片尺寸: \(imageSize)")
                     print("目标像素尺寸: \(originalSize)")
                     
-                    // 创建新的位图表示，直接指定像素尺寸
-                    if let cgImage = newImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-                        let bitmapRep = NSBitmapImageRep(
-                            bitmapDataPlanes: nil,
-                            pixelsWide: Int(originalSize.width),
-                            pixelsHigh: Int(originalSize.height),
-                            bitsPerSample: 8,
-                            samplesPerPixel: 4,
-                            hasAlpha: true,
-                            isPlanar: false,
-                            colorSpaceName: .deviceRGB,
-                            bytesPerRow: 0,
-                            bitsPerPixel: 0
-                        )
+                    // 使用 ImageIO 处理 GIF
+                    if let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil) {
+                        let frameCount = CGImageSourceGetCount(imageSource)
+                        print("GIF 帧数: \(frameCount)")
                         
-                        if let bitmapRep = bitmapRep {
-                            // 添加位图表示创建后的调试信息
-                            print("位图表示实际尺寸: \(bitmapRep.size)")
-                            print("位图表示像素尺寸: \(bitmapRep.pixelsWide)x\(bitmapRep.pixelsHigh)")
+                        // 创建目标
+                        guard let destination = CGImageDestinationCreateWithURL(
+                            saveURL as CFURL,
+                            UTType.gif.identifier as CFString,
+                            frameCount,
+                            nil
+                        ) else {
+                            print("无法创建 GIF 目标")
+                            return
+                        }
+                        
+                        // 获取原始 GIF 的属性
+                        let sourceProperties = CGImageSourceCopyProperties(imageSource, nil) as? [CFString: Any]
+                        let gifProperties = sourceProperties?[kCGImagePropertyGIFDictionary] as? [CFString: Any]
+                        
+                        // 设置 GIF 属性
+                        let destinationProperties: [CFString: Any] = [
+                            kCGImagePropertyGIFDictionary: [
+                                kCGImagePropertyGIFLoopCount: gifProperties?[kCGImagePropertyGIFLoopCount] ?? 0,
+                                kCGImagePropertyGIFDelayTime: gifProperties?[kCGImagePropertyGIFDelayTime] ?? 0.1
+                            ]
+                        ]
+                        
+                        CGImageDestinationSetProperties(destination, destinationProperties as CFDictionary)
+                        
+                        // 处理每一帧
+                        for index in 0..<frameCount {
+                            // 获取原始帧
+                            guard let originalFrame = CGImageSourceCreateImageAtIndex(imageSource, index, nil) else {
+                                print("无法获取第 \(index) 帧")
+                                continue
+                            }
+                            
+                            // 创建位图表示
+                            let bitmapRep = NSBitmapImageRep(
+                                bitmapDataPlanes: nil,
+                                pixelsWide: Int(originalSize.width),
+                                pixelsHigh: Int(originalSize.height),
+                                bitsPerSample: 8,
+                                samplesPerPixel: 4,
+                                hasAlpha: true,
+                                isPlanar: false,
+                                colorSpaceName: .deviceRGB,
+                                bytesPerRow: 0,
+                                bitsPerPixel: 0
+                            )
+                            
+                            guard let bitmapRep = bitmapRep else {
+                                print("无法创建位图表示")
+                                continue
+                            }
                             
                             // 直接在位图表示上绘制
                             if let context = NSGraphicsContext(bitmapImageRep: bitmapRep) {
@@ -1230,16 +1261,56 @@ struct ContentView: View {
                                 context.cgContext.setShouldSmoothFonts(true)
                                 context.cgContext.setAllowsFontSmoothing(true)
                                 
-                                // 绘制图像
-                                context.cgContext.draw(cgImage, in: CGRect(origin: .zero, size: originalSize))
+                                // 绘制原始帧
+                                context.cgContext.draw(originalFrame, in: CGRect(origin: .zero, size: originalSize))
+                                
+                                // 获取帧属性
+                                let frameProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, index, nil) as? [CFString: Any]
+                                let gifFrameProperties = frameProperties?[kCGImagePropertyGIFDictionary] as? [CFString: Any]
+                                
+                                // 计算自适应大小
+                                let adaptiveFontSize = calculateAdaptiveFontSize(for: originalSize, fontSize: params.fontSize)
+                                let adaptiveMargin = calculateAdaptiveMargin(for: originalSize)
+                                
+                                // 设置字体和颜色
+                                let fixedFont = NSFontManager.shared.convert(params.font, toSize: adaptiveFontSize)
+                                let attributes: [NSAttributedString.Key: Any] = [
+                                    .font: fixedFont,
+                                    .foregroundColor: params.color
+                                ]
+                                
+                                // 创建并绘制文字
+                                let attributedString = NSAttributedString(string: params.dateString, attributes: attributes)
+                                let stringSize = attributedString.size()
+                                
+                                attributedString.draw(at: NSPoint(
+                                    x: originalSize.width - stringSize.width - adaptiveMargin,
+                                    y: adaptiveMargin
+                                ))
                                 
                                 NSGraphicsContext.restoreGraphicsState()
+                                
+                                // 获取处理后的帧
+                                if let processedFrame = bitmapRep.cgImage {
+                                    // 设置帧属性
+                                    let frameDestinationProperties: [CFString: Any] = [
+                                        kCGImagePropertyGIFDictionary: [
+                                            kCGImagePropertyGIFDelayTime: gifFrameProperties?[kCGImagePropertyGIFDelayTime] ?? 0.1,
+                                            kCGImagePropertyGIFUnclampedDelayTime: gifFrameProperties?[kCGImagePropertyGIFUnclampedDelayTime] ?? 0.1
+                                        ]
+                                    ]
+                                    
+                                    // 添加帧到目标
+                                    CGImageDestinationAddImage(destination, processedFrame, frameDestinationProperties as CFDictionary)
+                                }
                             }
-                            
-                            try bitmapRep.representation(using: .gif, properties: gifProperties)?.write(to: saveURL)
-                            
-                            // 添加保存后的调试信息
-                            print("文件已保存到: \(saveURL.path)")
+                        }
+                        
+                        // 完成 GIF 创建
+                        if !CGImageDestinationFinalize(destination) {
+                            print("无法完成 GIF 创建")
+                        } else {
+                            print("GIF 已成功保存到: \(saveURL.path)")
                         }
                     }
                     
