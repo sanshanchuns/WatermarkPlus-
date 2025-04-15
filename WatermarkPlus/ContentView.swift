@@ -882,31 +882,73 @@ struct ContentView: View {
         
         // 创建新图像并添加水印
         let newImage = await Task.detached(priority: .userInitiated) { () -> NSImage? in
-            let result = NSImage(size: imageSize)
+            // 获取原始图片的像素尺寸
+            let originalSize: CGSize
+            if let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
+               let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any] {
+                let width = properties[kCGImagePropertyPixelWidth] as? Int ?? Int(imageSize.width)
+                let height = properties[kCGImagePropertyPixelHeight] as? Int ?? Int(imageSize.height)
+                originalSize = CGSize(width: width, height: height)
+            } else {
+                originalSize = imageSize
+            }
+            
+            // 创建位图表示
+            let bitmapRep = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: Int(originalSize.width),
+                pixelsHigh: Int(originalSize.height),
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0
+            )
+            
+            guard let bitmapRep = bitmapRep else { return nil }
+            
+            // 创建新的 NSImage
+            let result = NSImage(size: originalSize)
+            result.addRepresentation(bitmapRep)
+            
+            // 开始绘制
             result.lockFocus()
             
-            // 绘制原始图像
-            image.draw(in: NSRect(origin: .zero, size: imageSize))
-            
-            // 计算自适应大小
-            let adaptiveFontSize = calculateAdaptiveFontSize(for: imageSize, fontSize: params.fontSize)
-            let adaptiveMargin = calculateAdaptiveMargin(for: imageSize)
-            
-            // 设置字体和颜色
-            let fixedFont = NSFontManager.shared.convert(params.font, toSize: adaptiveFontSize)
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: fixedFont,
-                .foregroundColor: params.color
-            ]
-            
-            // 创建并绘制文字
-            let attributedString = NSAttributedString(string: params.dateString, attributes: attributes)
-            let stringSize = attributedString.size()
-            
-            attributedString.draw(at: NSPoint(
-                x: imageSize.width - stringSize.width - adaptiveMargin,
-                y: adaptiveMargin
-            ))
+            // 设置绘制上下文
+            if let context = NSGraphicsContext.current?.cgContext {
+                // 设置高质量渲染
+                context.setShouldAntialias(true)
+                context.setAllowsAntialiasing(true)
+                context.setShouldSmoothFonts(true)
+                context.setAllowsFontSmoothing(true)
+                
+                // 绘制原始图像
+                if let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                    context.draw(cgImage, in: CGRect(origin: .zero, size: originalSize))
+                }
+                
+                // 计算自适应大小，基于原始尺寸
+                let adaptiveFontSize = calculateAdaptiveFontSize(for: originalSize, fontSize: params.fontSize)
+                let adaptiveMargin = calculateAdaptiveMargin(for: originalSize)
+                
+                // 设置字体和颜色
+                let fixedFont = NSFontManager.shared.convert(params.font, toSize: adaptiveFontSize)
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: fixedFont,
+                    .foregroundColor: params.color
+                ]
+                
+                // 创建并绘制文字
+                let attributedString = NSAttributedString(string: params.dateString, attributes: attributes)
+                let stringSize = attributedString.size()
+                
+                attributedString.draw(at: NSPoint(
+                    x: originalSize.width - stringSize.width - adaptiveMargin,
+                    y: adaptiveMargin
+                ))
+            }
             
             result.unlockFocus()
             return result
@@ -926,96 +968,317 @@ struct ContentView: View {
                     )
                 }
                 
-                if let tiffData = newImage.tiffRepresentation,
-                   let bitmapImage = NSBitmapImageRep(data: tiffData) {
-                    
-                    switch fileExtension.lowercased() {
-                    case "heic":
-                        // 对于 HEIC 格式，使用 ImageIO 框架并保持原始分辨率
-                        if let cgImage = newImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-                            guard let destination = CGImageDestinationCreateWithURL(
-                                saveURL as CFURL,
-                                UTType.heic.identifier as CFString,
-                                1,
-                                nil
-                            ) else { return }
+                // 获取原始图片的像素尺寸
+                let originalSize: CGSize
+                if let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
+                   let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any] {
+                    let width = properties[kCGImagePropertyPixelWidth] as? Int ?? Int(imageSize.width)
+                    let height = properties[kCGImagePropertyPixelHeight] as? Int ?? Int(imageSize.height)
+                    originalSize = CGSize(width: width, height: height)
+                } else {
+                    originalSize = imageSize
+                }
+                
+                switch fileExtension.lowercased() {
+                case "heic":
+                    // 对于 HEIC 格式，使用 ImageIO 框架并保持原始分辨率
+                    if let cgImage = newImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                        guard let destination = CGImageDestinationCreateWithURL(
+                            saveURL as CFURL,
+                            UTType.heic.identifier as CFString,
+                            1,
+                            nil
+                        ) else { return }
+                        
+                        // 获取原始图片的属性
+                        guard let sourceImageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
+                              let properties = CGImageSourceCopyPropertiesAtIndex(sourceImageSource, 0, nil) as? [CFString: Any]
+                        else { return }
+                        
+                        // 获取原始 HEIC 图片的具体尺寸
+                        let originalWidth = properties[kCGImagePropertyPixelWidth] as? Int ?? cgImage.width
+                        let originalHeight = properties[kCGImagePropertyPixelHeight] as? Int ?? cgImage.height
+                        
+                        // 设置输出选项
+                        let options: [CFString: Any] = [
+                            kCGImageDestinationLossyCompressionQuality: 0.85,
+                            kCGImagePropertyOrientation: properties[kCGImagePropertyOrientation] ?? 1,
+                            kCGImageDestinationImageMaxPixelSize: max(originalWidth, originalHeight),
+                            kCGImagePropertyPixelWidth: originalWidth,
+                            kCGImagePropertyPixelHeight: originalHeight,
+                            kCGImagePropertyDPIWidth: properties[kCGImagePropertyDPIWidth] ?? 72,
+                            kCGImagePropertyDPIHeight: properties[kCGImagePropertyDPIHeight] ?? 72,
+                            kCGImageDestinationOptimizeColorForSharing: false,
+                            kCGImagePropertyColorModel: properties[kCGImagePropertyColorModel] ?? kCGImagePropertyColorModelRGB
+                        ]
+                        
+                        // 创建一个与原始尺寸相同的图像上下文
+                        let context = CGContext(
+                            data: nil,
+                            width: originalWidth,
+                            height: originalHeight,
+                            bitsPerComponent: 8,
+                            bytesPerRow: 0,
+                            space: cgImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                        )
+                        
+                        if let context = context {
+                            // 在正确的尺寸上绘制图像
+                            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: originalWidth, height: originalHeight))
                             
-                            // 获取原始图片的属性
-                            guard let sourceImageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
-                                  let properties = CGImageSourceCopyPropertiesAtIndex(sourceImageSource, 0, nil) as? [CFString: Any]
-                            else { return }
-                            
-                            // 获取原始 HEIC 图片的具体尺寸
-                            let originalWidth = properties[kCGImagePropertyPixelWidth] as? Int ?? cgImage.width
-                            let originalHeight = properties[kCGImagePropertyPixelHeight] as? Int ?? cgImage.height
-                            
-                            // 设置输出选项
-                            let options: [CFString: Any] = [
-                                kCGImageDestinationLossyCompressionQuality: 0.85,
-                                kCGImagePropertyOrientation: properties[kCGImagePropertyOrientation] ?? 1,
+                            if let finalImage = context.makeImage() {
+                                CGImageDestinationAddImage(destination, finalImage, options as CFDictionary)
                                 
-                                // 强制使用原始尺寸
-                                kCGImageDestinationImageMaxPixelSize: max(originalWidth, originalHeight),
-                                kCGImagePropertyPixelWidth: originalWidth,
-                                kCGImagePropertyPixelHeight: originalHeight,
-                                
-                                // 保持原始 DPI
-                                kCGImagePropertyDPIWidth: properties[kCGImagePropertyDPIWidth] ?? 72,
-                                kCGImagePropertyDPIHeight: properties[kCGImagePropertyDPIHeight] ?? 72,
-                                
-                                // 禁用任何自动缩放
-                                kCGImageDestinationOptimizeColorForSharing: false,
-                                
-                                // 使用原始色彩空间
-                                kCGImagePropertyColorModel: properties[kCGImagePropertyColorModel] ?? kCGImagePropertyColorModelRGB
-                            ]
-                            
-                            // 创建一个与原始尺寸相同的图像上下文
-                            let context = CGContext(
-                                data: nil,
-                                width: originalWidth,
-                                height: originalHeight,
-                                bitsPerComponent: 8,
-                                bytesPerRow: 0,
-                                space: cgImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!,
-                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-                            )
-                            
-                            if let context = context {
-                                // 在正确的尺寸上绘制图像
-                                context.draw(cgImage, in: CGRect(x: 0, y: 0, width: originalWidth, height: originalHeight))
-                                
-                                if let finalImage = context.makeImage() {
-                                    CGImageDestinationAddImage(destination, finalImage, options as CFDictionary)
-                                    
-                                    if !CGImageDestinationFinalize(destination) {
-                                        print("Failed to finalize HEIC image")
-                                    }
+                                if !CGImageDestinationFinalize(destination) {
+                                    print("Failed to finalize HEIC image")
                                 }
                             }
                         }
+                    }
+                    
+                case "png":
+                    // 设置 PNG 输出选项
+                    let pngProperties: [NSBitmapImageRep.PropertyKey: Any] = [
+                        .compressionFactor: 1.0,
+                        .interlaced: false
+                    ]
+                    
+                    // 添加调试信息
+                    print("PNG 输出调试信息:")
+                    print("原始图片尺寸: \(imageSize)")
+                    print("目标像素尺寸: \(originalSize)")
+                    
+                    // 创建新的位图表示，直接指定像素尺寸
+                    if let cgImage = newImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                        let bitmapRep = NSBitmapImageRep(
+                            bitmapDataPlanes: nil,
+                            pixelsWide: Int(originalSize.width),
+                            pixelsHigh: Int(originalSize.height),
+                            bitsPerSample: 8,
+                            samplesPerPixel: 4,
+                            hasAlpha: true,
+                            isPlanar: false,
+                            colorSpaceName: .deviceRGB,
+                            bytesPerRow: 0,
+                            bitsPerPixel: 0
+                        )
                         
-                    case "png":
-                        try bitmapImage.representation(using: .png, properties: [:])?.write(to: saveURL)
+                        if let bitmapRep = bitmapRep {
+                            // 添加位图表示创建后的调试信息
+                            print("位图表示实际尺寸: \(bitmapRep.size)")
+                            print("位图表示像素尺寸: \(bitmapRep.pixelsWide)x\(bitmapRep.pixelsHigh)")
+                            
+                            // 直接在位图表示上绘制
+                            if let context = NSGraphicsContext(bitmapImageRep: bitmapRep) {
+                                NSGraphicsContext.saveGraphicsState()
+                                NSGraphicsContext.current = context
+                                
+                                // 设置高质量渲染
+                                context.cgContext.setShouldAntialias(true)
+                                context.cgContext.setAllowsAntialiasing(true)
+                                context.cgContext.setShouldSmoothFonts(true)
+                                context.cgContext.setAllowsFontSmoothing(true)
+                                
+                                // 绘制图像
+                                context.cgContext.draw(cgImage, in: CGRect(origin: .zero, size: originalSize))
+                                
+                                NSGraphicsContext.restoreGraphicsState()
+                            }
+                            
+                            try bitmapRep.representation(using: .png, properties: pngProperties)?.write(to: saveURL)
+                            
+                            // 添加保存后的调试信息
+                            print("文件已保存到: \(saveURL.path)")
+                        }
+                    }
+                    
+                case "jpg", "jpeg":
+                    // 设置 JPEG 输出选项
+                    let jpegProperties: [NSBitmapImageRep.PropertyKey: Any] = [
+                        .compressionFactor: 0.85,
+                        .interlaced: false
+                    ]
+                    
+                    // 添加调试信息
+                    print("JPEG 输出调试信息:")
+                    print("原始图片尺寸: \(imageSize)")
+                    print("目标像素尺寸: \(originalSize)")
+                    
+                    // 创建新的位图表示，直接指定像素尺寸
+                    if let cgImage = newImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                        let bitmapRep = NSBitmapImageRep(
+                            bitmapDataPlanes: nil,
+                            pixelsWide: Int(originalSize.width),
+                            pixelsHigh: Int(originalSize.height),
+                            bitsPerSample: 8,
+                            samplesPerPixel: 4,
+                            hasAlpha: true,
+                            isPlanar: false,
+                            colorSpaceName: .deviceRGB,
+                            bytesPerRow: 0,
+                            bitsPerPixel: 0
+                        )
                         
-                    case "jpg", "jpeg":
-                        try bitmapImage.representation(
-                            using: .jpeg,
-                            properties: [.compressionFactor: 0.85]
-                        )?.write(to: saveURL)
+                        if let bitmapRep = bitmapRep {
+                            // 添加位图表示创建后的调试信息
+                            print("位图表示实际尺寸: \(bitmapRep.size)")
+                            print("位图表示像素尺寸: \(bitmapRep.pixelsWide)x\(bitmapRep.pixelsHigh)")
+                            
+                            // 直接在位图表示上绘制
+                            if let context = NSGraphicsContext(bitmapImageRep: bitmapRep) {
+                                NSGraphicsContext.saveGraphicsState()
+                                NSGraphicsContext.current = context
+                                
+                                // 设置高质量渲染
+                                context.cgContext.setShouldAntialias(true)
+                                context.cgContext.setAllowsAntialiasing(true)
+                                context.cgContext.setShouldSmoothFonts(true)
+                                context.cgContext.setAllowsFontSmoothing(true)
+                                
+                                // 绘制图像
+                                context.cgContext.draw(cgImage, in: CGRect(origin: .zero, size: originalSize))
+                                
+                                NSGraphicsContext.restoreGraphicsState()
+                            }
+                            
+                            try bitmapRep.representation(using: .jpeg, properties: jpegProperties)?.write(to: saveURL)
+                            
+                            // 添加保存后的调试信息
+                            print("文件已保存到: \(saveURL.path)")
+                        }
+                    }
+                    
+                case "tiff":
+                    // 设置 TIFF 输出选项
+                    let tiffProperties: [NSBitmapImageRep.PropertyKey: Any] = [
+                        .compressionMethod: NSBitmapImageRep.TIFFCompression.lzw,
+                        .interlaced: false
+                    ]
+                    
+                    // 创建新的位图表示，直接指定像素尺寸
+                    if let cgImage = newImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                        let bitmapRep = NSBitmapImageRep(
+                            bitmapDataPlanes: nil,
+                            pixelsWide: Int(originalSize.width),
+                            pixelsHigh: Int(originalSize.height),
+                            bitsPerSample: 8,
+                            samplesPerPixel: 4,
+                            hasAlpha: true,
+                            isPlanar: false,
+                            colorSpaceName: .deviceRGB,
+                            bytesPerRow: 0,
+                            bitsPerPixel: 0
+                        )
                         
-                    case "tiff":
-                        try bitmapImage.representation(
-                            using: .tiff,
-                            properties: [.compressionMethod: NSBitmapImageRep.TIFFCompression.lzw]
-                        )?.write(to: saveURL)
+                        if let bitmapRep = bitmapRep {
+                            // 创建临时图像用于绘制
+                            let tempImage = NSImage(size: originalSize)
+                            tempImage.addRepresentation(bitmapRep)
+                            
+                            // 绘制到临时图像
+                            tempImage.lockFocus()
+                            if let context = NSGraphicsContext.current?.cgContext {
+                                context.draw(cgImage, in: CGRect(origin: .zero, size: originalSize))
+                            }
+                            tempImage.unlockFocus()
+                            
+                            try bitmapRep.representation(using: .tiff, properties: tiffProperties)?.write(to: saveURL)
+                        }
+                    }
+                    
+                case "gif":
+                    // 设置 GIF 输出选项
+                    let gifProperties: [NSBitmapImageRep.PropertyKey: Any] = [
+                        .compressionFactor: 1.0,
+                        .interlaced: false
+                    ]
+                    
+                    // 添加调试信息
+                    print("GIF 输出调试信息:")
+                    print("原始图片尺寸: \(imageSize)")
+                    print("目标像素尺寸: \(originalSize)")
+                    
+                    // 创建新的位图表示，直接指定像素尺寸
+                    if let cgImage = newImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                        let bitmapRep = NSBitmapImageRep(
+                            bitmapDataPlanes: nil,
+                            pixelsWide: Int(originalSize.width),
+                            pixelsHigh: Int(originalSize.height),
+                            bitsPerSample: 8,
+                            samplesPerPixel: 4,
+                            hasAlpha: true,
+                            isPlanar: false,
+                            colorSpaceName: .deviceRGB,
+                            bytesPerRow: 0,
+                            bitsPerPixel: 0
+                        )
                         
-                    default:
-                        // 默认使用 JPEG 格式
-                        try bitmapImage.representation(
-                            using: .jpeg,
-                            properties: [.compressionFactor: 0.85]
-                        )?.write(to: saveURL)
+                        if let bitmapRep = bitmapRep {
+                            // 添加位图表示创建后的调试信息
+                            print("位图表示实际尺寸: \(bitmapRep.size)")
+                            print("位图表示像素尺寸: \(bitmapRep.pixelsWide)x\(bitmapRep.pixelsHigh)")
+                            
+                            // 直接在位图表示上绘制
+                            if let context = NSGraphicsContext(bitmapImageRep: bitmapRep) {
+                                NSGraphicsContext.saveGraphicsState()
+                                NSGraphicsContext.current = context
+                                
+                                // 设置高质量渲染
+                                context.cgContext.setShouldAntialias(true)
+                                context.cgContext.setAllowsAntialiasing(true)
+                                context.cgContext.setShouldSmoothFonts(true)
+                                context.cgContext.setAllowsFontSmoothing(true)
+                                
+                                // 绘制图像
+                                context.cgContext.draw(cgImage, in: CGRect(origin: .zero, size: originalSize))
+                                
+                                NSGraphicsContext.restoreGraphicsState()
+                            }
+                            
+                            try bitmapRep.representation(using: .gif, properties: gifProperties)?.write(to: saveURL)
+                            
+                            // 添加保存后的调试信息
+                            print("文件已保存到: \(saveURL.path)")
+                        }
+                    }
+                    
+                default:
+                    // 默认使用 JPEG 格式
+                    let jpegProperties: [NSBitmapImageRep.PropertyKey: Any] = [
+                        .compressionFactor: 0.85,
+                        .interlaced: false
+                    ]
+                    
+                    // 创建新的位图表示，直接指定像素尺寸
+                    if let cgImage = newImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                        let bitmapRep = NSBitmapImageRep(
+                            bitmapDataPlanes: nil,
+                            pixelsWide: Int(originalSize.width),
+                            pixelsHigh: Int(originalSize.height),
+                            bitsPerSample: 8,
+                            samplesPerPixel: 4,
+                            hasAlpha: true,
+                            isPlanar: false,
+                            colorSpaceName: .deviceRGB,
+                            bytesPerRow: 0,
+                            bitsPerPixel: 0
+                        )
+                        
+                        if let bitmapRep = bitmapRep {
+                            // 创建临时图像用于绘制
+                            let tempImage = NSImage(size: originalSize)
+                            tempImage.addRepresentation(bitmapRep)
+                            
+                            // 绘制到临时图像
+                            tempImage.lockFocus()
+                            if let context = NSGraphicsContext.current?.cgContext {
+                                context.draw(cgImage, in: CGRect(origin: .zero, size: originalSize))
+                            }
+                            tempImage.unlockFocus()
+                            
+                            try bitmapRep.representation(using: .jpeg, properties: jpegProperties)?.write(to: saveURL)
+                        }
                     }
                 }
             }.value
