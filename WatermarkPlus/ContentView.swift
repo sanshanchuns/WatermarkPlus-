@@ -100,12 +100,16 @@ struct ContentView: View {
     
     // 添加字体大小枚举
     enum FontSize: String, CaseIterable {
-        case small = "Small"
-        case medium = "Medium"
-        case large = "Large"
+        case small = "small"
+        case medium = "medium"
+        case large = "large"
         
         var localizedName: String {
-            rawValue.localized
+            switch self {
+                case .small: return "小".localized
+                case .medium: return "中".localized
+                case .large: return "大".localized
+            }
         }
         
         var scaleFactor: Double {
