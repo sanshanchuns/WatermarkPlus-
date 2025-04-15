@@ -647,6 +647,11 @@ struct ContentView: View {
         let imageSize = originalImage.size
         
         Task {
+            // 获取当前预览图片的创建时间
+            let imageURL = selectedImages[selectedPreviewIndex]
+            let photoDate = getPhotoCreationDate(from: imageURL) ?? Date()
+            let dateString = dateFormatter.string(from: photoDate)
+            
             // 在主线程创建和更新水印层
             await MainActor.run {
                 // 创建新的水印层
@@ -656,9 +661,6 @@ struct ContentView: View {
                 // 确保背景透明
                 NSColor.clear.set()
                 NSRect(origin: .zero, size: imageSize).fill()
-                
-                // 获取日期字符串
-                let dateString = dateFormatter.string(from: Date())
                 
                 // 计算自适应大小
                 let adaptiveFontSize = calculateAdaptiveFontSize(for: imageSize, fontSize: selectedFontSize)
@@ -841,10 +843,37 @@ struct ContentView: View {
         let outputDir: URL
     }
     
+    // 获取照片创建时间的函数
+    private func getPhotoCreationDate(from imageURL: URL) -> Date? {
+        if let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
+           let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any] {
+            // 尝试从 EXIF 获取创建时间
+            if let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any],
+               let dateTimeOriginal = exif[kCGImagePropertyExifDateTimeOriginal] as? String {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+                return formatter.date(from: dateTimeOriginal)
+            }
+            
+            // 尝试从 TIFF 获取创建时间
+            if let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any],
+               let dateTime = tiff[kCGImagePropertyTIFFDateTime] as? String {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+                return formatter.date(from: dateTime)
+            }
+        }
+        return nil
+    }
+    
     // 修改处理图片函数
     private func processImage(_ imageURL: URL, with params: ProcessParams) async throws {
         let fileExtension = imageURL.pathExtension.lowercased()
         let image: NSImage
+        
+        // 获取照片创建时间
+        let photoDate = getPhotoCreationDate(from: imageURL) ?? Date()
+        let dateString = dateFormatter.string(from: photoDate)
         
         if fileExtension == "heic" {
             // 在后台线程加载 HEIC 图片
