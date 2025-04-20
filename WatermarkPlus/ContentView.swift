@@ -743,8 +743,13 @@ struct ContentView: View {
             if let saveURL = saveURL {
                 currentTask = Task {
                     do {
+                        // 获取当前预览图片的创建时间
+                        let imageURL = selectedImages[selectedPreviewIndex]
+                        let photoDate = getPhotoCreationDate(from: imageURL) ?? Date()
+                        let dateString = dateFormatter.string(from: photoDate)
+                        
                         let processParams = ProcessParams(
-                            dateString: dateFormatter.string(from: Date()),
+                            dateString: dateString,
                             color: selectedColor,
                             font: ledFont,
                             fontSize: selectedFontSize,
@@ -870,10 +875,6 @@ struct ContentView: View {
     private func processImage(_ imageURL: URL, with params: ProcessParams) async throws {
         let fileExtension = imageURL.pathExtension.lowercased()
         let image: NSImage
-        
-        // 获取照片创建时间
-        let photoDate = getPhotoCreationDate(from: imageURL) ?? Date()
-        let dateString = dateFormatter.string(from: photoDate)
         
         if fileExtension == "heic" {
             // 在后台线程加载 HEIC 图片
@@ -1469,8 +1470,9 @@ struct ContentView: View {
                         // 绘制原始图像
                         image.draw(in: NSRect(origin: .zero, size: imageSize))
                         
-                        // 获取日期字符串
-                        let dateString = dateFormatter.string(from: Date())
+                        // 获取照片创建时间
+                        let photoDate = getPhotoCreationDate(from: imageURL) ?? Date()
+                        let dateString = dateFormatter.string(from: photoDate)
                         
                         // 计算自适应大小
                         let adaptiveFontSize = calculateAdaptiveFontSize(for: imageSize, fontSize: selectedFontSize)

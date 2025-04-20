@@ -12,7 +12,6 @@
 		675BF04C2DA69143009442D4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 675BF04B2DA69143009442D4 /* Assets.xcassets */; };
 		675BF04F2DA69143009442D4 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 675BF04E2DA69143009442D4 /* Preview Assets.xcassets */; };
 		675BF0572DA69172009442D4 /* led-digital-7-1.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 675BF0562DA69172009442D4 /* led-digital-7-1.ttf */; };
-		675BF05B2DA82046009442D4 /* Digital-Dismay-1.otf in Resources */ = {isa = PBXBuildFile; fileRef = 675BF05A2DA82046009442D4 /* Digital-Dismay-1.otf */; };
 		675BF07F2DAD5F42009442D4 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 675BF07D2DAD5F42009442D4 /* Localizable.strings */; };
 /* End PBXBuildFile section */
 
@@ -25,7 +24,6 @@
 		675BF0502DA69143009442D4 /* WatermarkPlus.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WatermarkPlus.entitlements; sourceTree = "<group>"; };
 		675BF0562DA69172009442D4 /* led-digital-7-1.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "led-digital-7-1.ttf"; sourceTree = "<group>"; };
 		675BF0582DA6917A009442D4 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		675BF05A2DA82046009442D4 /* Digital-Dismay-1.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Digital-Dismay-1.otf"; sourceTree = "<group>"; };
 		675BF07E2DAD5F42009442D4 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		675BF0802DAD5F4C009442D4 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -64,7 +62,6 @@
 				675BF0492DA69141009442D4 /* ContentView.swift */,
 				675BF04B2DA69143009442D4 /* Assets.xcassets */,
 				675BF0562DA69172009442D4 /* led-digital-7-1.ttf */,
-				675BF05A2DA82046009442D4 /* Digital-Dismay-1.otf */,
 				675BF0582DA6917A009442D4 /* Info.plist */,
 				675BF07D2DAD5F42009442D4 /* Localizable.strings */,
 				675BF0502DA69143009442D4 /* WatermarkPlus.entitlements */,
@@ -143,7 +140,6 @@
 				675BF04F2DA69143009442D4 /* Preview Assets.xcassets in Resources */,
 				675BF0572DA69172009442D4 /* led-digital-7-1.ttf in Resources */,
 				675BF04C2DA69143009442D4 /* Assets.xcassets in Resources */,
-				675BF05B2DA82046009442D4 /* Digital-Dismay-1.otf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -300,7 +296,7 @@
 				CODE_SIGN_ENTITLEMENTS = WatermarkPlus/WatermarkPlus.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_ASSET_PATHS = "\"WatermarkPlus/Preview Content\"";
 				DEVELOPMENT_TEAM = 7U634AK5AY;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -329,7 +325,7 @@
 				CODE_SIGN_ENTITLEMENTS = WatermarkPlus/WatermarkPlus.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_ASSET_PATHS = "\"WatermarkPlus/Preview Content\"";
 				DEVELOPMENT_TEAM = 7U634AK5AY;
 				ENABLE_HARDENED_RUNTIME = YES;
