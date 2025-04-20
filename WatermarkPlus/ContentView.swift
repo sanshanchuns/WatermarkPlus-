@@ -743,19 +743,6 @@ struct ContentView: View {
             if let saveURL = saveURL {
                 currentTask = Task {
                     do {
-                        // 获取当前预览图片的创建时间
-                        let imageURL = selectedImages[selectedPreviewIndex]
-                        let photoDate = getPhotoCreationDate(from: imageURL) ?? Date()
-                        let dateString = dateFormatter.string(from: photoDate)
-                        
-                        let processParams = ProcessParams(
-                            dateString: dateString,
-                            color: selectedColor,
-                            font: ledFont,
-                            fontSize: selectedFontSize,
-                            outputDir: saveURL
-                        )
-                        
                         let progress = ProcessingProgress(total: selectedImages.count)
                         
                         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -774,6 +761,18 @@ struct ContentView: View {
                                     await MainActor.run {
                                         currentProcessingFile = imageURL.lastPathComponent
                                     }
+                                    
+                                    // 获取当前照片的创建时间
+                                    let photoDate = getPhotoCreationDate(from: imageURL) ?? Date()
+                                    let dateString = dateFormatter.string(from: photoDate)
+                                    
+                                    let processParams = ProcessParams(
+                                        dateString: dateString,
+                                        color: selectedColor,
+                                        font: ledFont,
+                                        fontSize: selectedFontSize,
+                                        outputDir: saveURL
+                                    )
                                     
                                     try await processImage(imageURL, with: processParams)
                                     
