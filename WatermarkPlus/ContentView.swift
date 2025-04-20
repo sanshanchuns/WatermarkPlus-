@@ -849,24 +849,95 @@ struct ContentView: View {
     
     // 获取照片创建时间的函数
     private func getPhotoCreationDate(from imageURL: URL) -> Date? {
-        if let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
-           let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any] {
-            // 尝试从 EXIF 获取创建时间
-            if let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any],
-               let dateTimeOriginal = exif[kCGImagePropertyExifDateTimeOriginal] as? String {
-                let formatter = DateFormatter()
-                formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
-                return formatter.date(from: dateTimeOriginal)
+        print("尝试获取照片创建时间: \(imageURL.path)")
+        
+        // 首先尝试从文件系统属性获取创建日期
+        do {
+            let fileAttributes = try FileManager.default.attributesOfItem(atPath: imageURL.path)
+            if let creationDate = fileAttributes[.creationDate] as? Date {
+                print("从文件系统属性获取创建时间: \(creationDate)")
+                return creationDate
+            } else {
+                print("文件系统属性中没有创建日期")
             }
-            
-            // 尝试从 TIFF 获取创建时间
-            if let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any],
-               let dateTime = tiff[kCGImagePropertyTIFFDateTime] as? String {
-                let formatter = DateFormatter()
-                formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
-                return formatter.date(from: dateTime)
-            }
+        } catch {
+            print("无法获取文件系统属性: \(error.localizedDescription)")
         }
+        
+        // 如果文件系统属性获取失败，继续尝试从图片元数据获取
+        guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil) else {
+            print("无法创建图片源: \(imageURL.path)")
+            return nil
+        }
+        
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any] else {
+            print("无法获取图片属性: \(imageURL.path)")
+            return nil
+        }
+        
+        print("图片属性: \(properties)")
+        
+        // 尝试从 EXIF 获取创建时间
+        if let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any] {
+            print("EXIF 信息: \(exif)")
+            if let dateTimeOriginal = exif[kCGImagePropertyExifDateTimeOriginal] as? String {
+                print("从 EXIF DateTimeOriginal 获取时间: \(dateTimeOriginal)")
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+                if let date = formatter.date(from: dateTimeOriginal) {
+                    print("成功解析 EXIF 时间: \(date)")
+                    return date
+                } else {
+                    print("无法解析 EXIF 时间格式: \(dateTimeOriginal)")
+                }
+            } else {
+                print("EXIF 中没有 DateTimeOriginal 字段")
+            }
+        } else {
+            print("图片没有 EXIF 信息")
+        }
+        
+        // 尝试从 TIFF 获取创建时间
+        if let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any] {
+            print("TIFF 信息: \(tiff)")
+            if let dateTime = tiff[kCGImagePropertyTIFFDateTime] as? String {
+                print("从 TIFF DateTime 获取时间: \(dateTime)")
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+                if let date = formatter.date(from: dateTime) {
+                    print("成功解析 TIFF 时间: \(date)")
+                    return date
+                } else {
+                    print("无法解析 TIFF 时间格式: \(dateTime)")
+                }
+            } else {
+                print("TIFF 中没有 DateTime 字段")
+            }
+        } else {
+            print("图片没有 TIFF 信息")
+        }
+        
+        // 尝试从 IPTC 获取创建时间
+        if let iptc = properties[kCGImagePropertyIPTCDictionary] as? [CFString: Any] {
+            print("IPTC 信息: \(iptc)")
+            if let dateCreated = iptc[kCGImagePropertyIPTCDateCreated] as? String {
+                print("从 IPTC DateCreated 获取时间: \(dateCreated)")
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyyMMdd"
+                if let date = formatter.date(from: dateCreated) {
+                    print("成功解析 IPTC 时间: \(date)")
+                    return date
+                } else {
+                    print("无法解析 IPTC 时间格式: \(dateCreated)")
+                }
+            } else {
+                print("IPTC 中没有 DateCreated 字段")
+            }
+        } else {
+            print("图片没有 IPTC 信息")
+        }
+        
+        print("无法从任何来源获取照片创建时间: \(imageURL.path)")
         return nil
     }
     
